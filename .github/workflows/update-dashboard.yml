@@ -1,0 +1,72 @@
+name: 대시보드 데이터 갱신·배포
+
+# data/raw 에 엑셀을 올리거나(push) Actions 탭에서 직접 실행하면
+# 1) 엑셀 → data/pos_data.json 변환  2) 저장소에 커밋  3) GitHub Pages 배포
+on:
+  push:
+    branches: [main]
+    paths:
+      - "data/raw/**"
+      - "scripts/**"
+      - "index.html"
+      - ".github/workflows/update-dashboard.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: dashboard
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 패키지 설치
+        run: pip install openpyxl==3.1.5
+
+      - name: 엑셀 → JSON 변환
+        run: python scripts/build_data.py
+
+      - name: 변환 결과 커밋
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/pos_data.json
+          if git diff --cached --quiet; then
+            echo "데이터 변경 없음"
+          else
+            git commit -m "데이터 갱신 $(TZ=Asia/Seoul date +'%Y-%m-%d %H:%M')"
+            git push
+          fi
+
+      # 배포 폴더에는 화면(index.html)과 변환된 JSON만 넣습니다. 원본 엑셀은 배포하지 않습니다.
+      - name: 배포 파일 준비
+        run: |
+          mkdir -p _site/data
+          cp index.html _site/
+          cp data/pos_data.json _site/data/
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

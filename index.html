@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>이마트 POS 영업 대시보드</title>
+<script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+<style>
+:root {
+  --fg: #1f1e1c; --muted: #6b6a66; --bg: #f6f5f2; --panel: #ffffff; --line: #e4e1da;
+  --ok: #2e7d4f; --bad: #c0392b; --grid: #ecebe6; --axis: #cfccc5; --chart-muted: #cdcac2;
+  --c0: #2f6db5; --c1: #e07b39; --c2: #3a9a6b; --c3: #8e5ac8; --c4: #c9a227; --c5: #d0587e; --c6: #5a8f9e;
+  --tip-bg: #ffffff; --shadow: 0 6px 20px rgba(0,0,0,.12);
+  --r: 8px; --gap: 16px;
+  --font: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --fg: #eceae4; --muted: #a3a09a; --bg: #1b1b1a; --panel: #252523; --line: #3a3936; --ok: #5cbf86; --bad: #ef7a6c;
+    --grid: #33322f; --axis: #4a4945; --chart-muted: #55534e; --c0: #6ea0e0; --c1: #f0995e; --c2: #5cbf8f; --c3: #b08ae0; --c4: #e0c055; --c5: #ec86a6; --c6: #7fb6c4;
+    --tip-bg: #2e2e2b; --shadow: 0 6px 20px rgba(0,0,0,.5); }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 14px; }
+.wrap { max-width: 1280px; margin: 0 auto; padding: 20px 20px 60px; display: flex; flex-direction: column; gap: var(--gap); }
+h1 { font-size: 24px; font-weight: 600; margin: 0; }
+h2 { font-size: 16px; font-weight: 600; margin: 0; }
+h3 { font-size: 14px; font-weight: 600; margin: 0 0 8px; }
+.lede { margin: 6px 0 0; line-height: 1.7; font-size: 15px; }
+.lede b { font-weight: 600; }
+.note, .hint { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.hint { margin-top: 4px; }
+.up { color: var(--ok); } .down { color: var(--bad); }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 18px; min-width: 0; }
+.card > h2 + .hint { margin-bottom: 8px; }
+.head-row { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: flex-start; justify-content: space-between; }
+.head-row > div:first-child { flex: 1 1 560px; min-width: 0; }
+.meta { font-size: 12px; color: var(--muted); text-align: right; margin-left: auto; }
+.btn { font: inherit; font-size: 12px; color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 6px 12px; cursor: pointer; }
+.btn:hover:not(:disabled) { border-color: var(--muted); }
+.btn:disabled { opacity: .45; cursor: default; }
+select, input[type=search] { font: inherit; font-size: 13px; color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 5px 8px; }
+.filters { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; position: sticky; top: 0; z-index: 10; background: var(--bg); padding: 10px 0; border-bottom: 1px solid var(--line); }
+.filters label, .ctl label { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.tabs { display: flex; gap: 2px; overflow-x: auto; border-bottom: 1px solid var(--line); }
+.tab { font: inherit; font-size: 14px; background: none; border: 0; border-bottom: 2px solid transparent; color: var(--muted); padding: 10px 14px; cursor: pointer; white-space: nowrap; }
+.tab.on { color: var(--fg); border-bottom-color: var(--fg); font-weight: 600; }
+.sec { display: flex; flex-direction: column; gap: var(--gap); }
+[hidden] { display: none !important; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+.k-l { font-size: 12px; color: var(--muted); }
+.k-v { font-size: 26px; font-weight: 600; font-variant-numeric: tabular-nums; margin: 4px 0; white-space: nowrap; }
+.k-s { font-size: 12px; color: var(--muted); line-height: 1.6; }
+.k-s b { font-weight: 600; }
+.tier { text-align: left; font: inherit; color: inherit; cursor: pointer; }
+.tier.on { outline: 2px solid var(--fg); outline-offset: -2px; }
+.tier.off { opacity: .55; }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: var(--gap); }
+.row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.chart { position: relative; min-height: 220px; margin-top: 8px; }
+.box { position: relative; min-height: 80px; margin-top: 8px; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 8px; font-size: 12px; color: var(--muted); }
+.lg { display: inline-flex; align-items: center; gap: 6px; }
+.sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; }
+svg.c { display: block; overflow: visible; }
+.gridl { stroke: var(--grid); }
+.tick { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.vlab { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.hit { fill: transparent; } .hit.click { cursor: pointer; } .hit:hover { fill: var(--grid); fill-opacity: .45; }
+.tip { position: absolute; z-index: 20; pointer-events: none; background: var(--tip-bg); border: 1px solid var(--line); box-shadow: var(--shadow); border-radius: var(--r); padding: 8px 10px; font-size: 12px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.tip-h { color: var(--fg); font-weight: 600; margin-bottom: 2px; }
+.hb { display: flex; flex-direction: column; gap: 3px; }
+.hb-row { display: grid; grid-template-columns: minmax(80px, 34%) 1fr auto; align-items: center; gap: 8px; font: inherit; font-size: 12px; color: inherit; background: none; border: 0; padding: 4px 6px; border-radius: var(--r); text-align: left; width: 100%; }
+.hb-row.click { cursor: pointer; } .hb-row.click:hover { background: var(--bg); }
+.hb-row.on { background: var(--bg); outline: 1px solid var(--line); } .hb-row.off { opacity: .5; }
+.hb-l, .wf-l { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hb-t { height: 12px; background: var(--bg); border-radius: 2px; overflow: hidden; }
+.hb-b { display: block; height: 100%; border-radius: 2px; }
+.hb-v { font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+.wf { display: flex; flex-direction: column; gap: 3px; }
+.wf-row { display: grid; grid-template-columns: minmax(100px, 30%) 1fr 90px; align-items: center; gap: 8px; font: inherit; font-size: 12px; color: inherit; background: none; border: 0; padding: 4px 6px; border-radius: var(--r); text-align: left; width: 100%; }
+.wf-row.total { font-weight: 600; } .wf-row.click { cursor: pointer; } .wf-row.click:hover { background: var(--bg); }
+.wf-t { position: relative; height: 18px; border-left: 1px solid var(--axis); }
+.wf-b { position: absolute; top: 0; bottom: 0; border-radius: 2px; }
+.wf-v { text-align: right; font-variant-numeric: tabular-nums; }
+.wf-v.up { color: var(--ok); } .wf-v.down { color: var(--bad); }
+.ctl { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
+.seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
+.seg button { font: inherit; font-size: 12px; background: var(--panel); color: var(--muted); border: 0; border-right: 1px solid var(--line); padding: 6px 12px; cursor: pointer; }
+.seg button:last-child { border-right: 0; }
+.seg button.on { background: var(--fg); color: var(--bg); }
+.crumb { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 8px; font-size: 12px; }
+.crumb button { font: inherit; background: none; border: 0; padding: 2px 4px; color: var(--fg); text-decoration: underline; cursor: pointer; }
+.crumb button:disabled { text-decoration: none; color: var(--muted); cursor: default; }
+.crumb span { color: var(--muted); }
+.tw { overflow: auto; max-height: 560px; margin-top: 8px; border: 1px solid var(--line); border-radius: var(--r); }
+table.t { width: 100%; border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; }
+table.t th { position: sticky; top: 0; background: var(--panel); text-align: left; font-weight: 600; color: var(--muted); padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; z-index: 1; }
+table.t th.n, table.t td.n { text-align: right; }
+table.t th.c, table.t td.c { text-align: center; }
+table.t th[data-f] { cursor: pointer; user-select: none; }
+table.t th[data-f]::after { content: " ↕"; opacity: .3; }
+table.t th.asc::after { content: " ▲"; opacity: .9; }
+table.t th.desc::after { content: " ▼"; opacity: .9; }
+table.t td { padding: 7px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+table.t td.name { white-space: normal; min-width: 160px; }
+table.t tr.click { cursor: pointer; } table.t tbody tr.click:hover td { background: var(--bg); }
+table.t tr.sel td { background: var(--bg); font-weight: 600; }
+.empty { text-align: center; color: var(--muted); padding: 18px !important; }
+.spark-hi { fill: var(--grid); }
+.fc { display: grid; grid-template-columns: minmax(260px, 320px) 1fr; gap: var(--gap); align-items: start; }
+@media (max-width: 860px) { .fc { grid-template-columns: 1fr; } }
+.fc-out { display: flex; flex-direction: column; gap: var(--gap); min-width: 0; }
+.fld { display: flex; flex-direction: column; gap: 4px; margin-top: 12px; font-size: 12px; }
+.fld > span { display: flex; justify-content: space-between; color: var(--muted); }
+.fld > span b { color: var(--fg); font-variant-numeric: tabular-nums; }
+.fld input[type=range] { width: 100%; accent-color: var(--c0); }
+.chips { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; }
+.chip { font: inherit; font-size: 12px; padding: 5px 0; border: 1px solid var(--line); border-radius: var(--r); background: var(--panel); color: var(--muted); cursor: pointer; }
+.chip.on { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.sub { margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--line); }
+details.defs { font-size: 12px; color: var(--muted); }
+details.defs summary { cursor: pointer; color: var(--fg); }
+details.defs li { margin: 4px 0; line-height: 1.6; }
+.loader { display: flex; flex-direction: column; gap: 12px; align-items: flex-start; }
+.drop { border: 2px dashed var(--line); border-radius: var(--r); padding: 28px; width: 100%; text-align: center; color: var(--muted); }
+.drop.over { border-color: var(--c0); color: var(--fg); }
+.status { font-size: 12px; color: var(--muted); white-space: pre-line; }
+@media print {
+  .filters { position: static; } .tabs, .btn, input[type=search] { display: none !important; }
+  .sec { break-before: page; } .tw { max-height: none; overflow: visible; }
+}
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+
+<header class="head-row" id="head">
+  <div>
+    <h1>이마트 POS 영업 대시보드</h1>
+    <p class="lede" id="lede" hidden><span id="l-period">—</span> 판매수량은 <b id="l-total">—</b>개입니다. 마지막 달(<span id="l-last">—</span>)은 전월 대비 <b id="l-mom">—</b>이고, 가장 큰 업태는 <b id="l-top">—</b>(비중 <span id="l-share">—</span>)입니다.</p>
+    <p class="note">모든 수치는 POS 판매수량(개) 기준입니다. 원본 파일에 금액 열이 없어 금액은 다루지 않습니다.</p>
+  </div>
+  <div class="meta">
+    <div id="meta-info">데이터 불러오는 중…</div>
+    <div style="margin-top:6px"><button class="btn" id="open-files" type="button">엑셀 파일 직접 불러오기</button></div>
+    <input type="file" id="file-in" accept=".xlsx,.json" multiple hidden>
+  </div>
+</header>
+
+<section class="card loader" id="loader" hidden>
+  <h2>데이터 파일을 불러와 주세요</h2>
+  <p class="note">data/pos_data.json 을 찾지 못했습니다. 로컬에서 이 파일을 바로 연 경우에는 이마트 POS 엑셀(파일명에 202501 같은 연월 포함)이나 pos_data.json 을 아래에 끌어다 놓거나 선택하세요. 파일은 이 브라우저 안에서만 읽고 어디에도 올리지 않습니다.</p>
+  <div class="drop" id="drop">여기에 엑셀(.xlsx) 여러 개 또는 pos_data.json 을 끌어다 놓기<br><br><button class="btn" id="pick" type="button">파일 선택</button></div>
+  <div class="status" id="load-status"></div>
+</section>
+
+<div id="main" hidden>
+<div class="filters" id="filters">
+  <label>기간 <select id="f-m1" aria-label="시작 월"></select> ~ <select id="f-m2" aria-label="끝 월"></select></label>
+  <label>업태 <select id="f-ch" aria-label="업태"></select></label>
+  <label>품목군 <select id="f-grp" aria-label="품목군"></select></label>
+  <label>점포 Tier <select id="f-tier" aria-label="점포 Tier"><option value="">전체</option><option value="A">A</option><option value="B">B</option><option value="C">C</option></select></label>
+  <button type="button" class="btn" id="f-reset">필터 초기화</button>
+</div>
+
+<nav class="tabs" role="tablist" style="margin-top:12px">
+  <button type="button" class="tab" data-tab="sum">1. 매출 종합</button>
+  <button type="button" class="tab" data-tab="bridge">2. 변동 원인</button>
+  <button type="button" class="tab" data-tab="prod">3. 품목별 실적</button>
+  <button type="button" class="tab" data-tab="store">4. 점포별 실적</button>
+  <button type="button" class="tab" data-tab="fc">5. 예측 시뮬레이션</button>
+</nav>
+
+<!-- 1. 매출 종합 -->
+<section class="sec" id="sum" style="margin-top:16px">
+  <div class="kpis">
+    <div class="card"><div class="k-l">판매수량 · <span id="k-win">—</span></div><div class="k-v" id="k-total">—</div><div class="k-s">직전 같은 기간 대비 <b id="k-prev">—</b><br>전년 같은 기간 대비 <b id="k-yoy">—</b></div></div>
+    <div class="card"><div class="k-l">월평균 판매수량</div><div class="k-v" id="k-avg">—</div><div class="k-s">선택 기간 합계 ÷ 개월 수</div></div>
+    <div class="card"><div class="k-l">마지막 달 판매수량 (<span id="k-lastm">—</span>)</div><div class="k-v" id="k-last">—</div><div class="k-s">전월 대비 <b id="k-mom">—</b></div></div>
+    <div class="card"><div class="k-l">판매 점포 수</div><div class="k-v" id="k-stores">—</div><div class="k-s">점포당 월평균 <b id="k-per">—</b>개</div></div>
+    <div class="card"><div class="k-l">판매 SKU 수</div><div class="k-v" id="k-sku">—</div><div class="k-s">한 번 이상 팔린 상품 수</div></div>
+  </div>
+  <div class="card">
+    <h2>월별 판매수량 추이 (업태별)</h2>
+    <p class="hint">막대를 누르면 그 달의 일별 추이로 들어갑니다. 흐린 막대는 선택 기간 밖입니다.</p>
+    <div class="legend" id="ch-legend"></div>
+    <div class="chart" id="trend"></div>
+  </div>
+  <div class="card" id="daily-card" hidden>
+    <div class="row"><h2><span id="daily-title">—</span> 일별 판매수량</h2><button type="button" class="btn" id="daily-close">← 월별로 돌아가기</button></div>
+    <p class="hint">진한 막대가 주말(토·일)입니다. 점포 Tier 필터는 일별 자료에 적용되지 않습니다.</p>
+    <div class="chart" id="daily"></div>
+  </div>
+  <div class="grid2">
+    <div class="card"><h2>업태별 판매수량</h2><p class="hint">업태를 누르면 대시보드 전체가 그 업태로 필터됩니다. 다시 누르면 해제됩니다.</p><div class="box" id="ch-bars"></div></div>
+    <div class="card"><h2>품목군별 판매수량</h2><p class="hint">품목군을 누르면 그 안의 상품별로 내려갑니다.</p><div class="crumb" id="grp-crumb"></div><div class="box" id="grp-bars"></div></div>
+  </div>
+</section>
+
+<!-- 2. 변동 원인 -->
+<section class="sec" id="bridge" style="margin-top:16px" hidden>
+  <div class="card">
+    <div class="ctl">
+      <label>기준 기간 <select id="b-a" aria-label="기준 기간"></select></label>
+      <label>비교 기간 <select id="b-b" aria-label="비교 기간"></select></label>
+      <label>분해 기준</label>
+      <div class="seg" id="b-dim"><button type="button" data-dim="ch">업태</button><button type="button" data-dim="grp">품목군</button><button type="button" data-dim="store">점포</button><button type="button" data-dim="prod">상품</button><button type="button" data-dim="fx">취급 요인</button></div>
+    </div>
+    <div class="crumb" id="br-crumb"></div>
+    <p class="hint">업태·품목군·Tier 필터는 적용되고, 상단 기간 대신 여기서 고른 두 기간을 비교합니다.</p>
+  </div>
+  <p class="lede"><span id="br-a">—</span> 대비 <span id="br-b">—</span> 판매수량은 <b id="br-d">—</b>(<b id="br-p">—</b>) 변했습니다. <span id="br-diml">—</span> 기준으로 가장 크게 늘어난 곳은 <b id="br-up">—</b>, 가장 크게 줄어든 곳은 <b id="br-down">—</b>입니다.</p>
+  <div class="kpis">
+    <div class="card"><div class="k-l">기준 · <span id="bk-al">—</span></div><div class="k-v" id="bk-a">—</div><div class="k-s">판매수량(개)</div></div>
+    <div class="card"><div class="k-l">비교 · <span id="bk-bl">—</span></div><div class="k-v" id="bk-b">—</div><div class="k-s">증감 <b id="bk-d">—</b> (<b id="bk-dp">—</b>)</div></div>
+    <div class="card"><div class="k-l">판매점포 수 변화 효과</div><div class="k-v" id="bk-s">—</div><div class="k-s">판매점포 <span id="bk-sn">—</span></div></div>
+    <div class="card"><div class="k-l">점포당 판매량 변화 효과</div><div class="k-v" id="bk-v">—</div><div class="k-s">점포당 <span id="bk-vn">—</span></div></div>
+  </div>
+  <div class="card">
+    <h2>판매수량 증감 워터폴</h2>
+    <p class="hint">초록은 증가, 빨강은 감소입니다. › 표시가 있는 막대를 누르면 하위 단계로 내려갑니다(업태 → 점포 → 상품, 품목군 → 상품).</p>
+    <div class="box" id="wf"></div>
+  </div>
+  <div class="card">
+    <div class="row"><h2>증감 상세</h2><div><input type="search" placeholder="항목 검색" data-q="bt" aria-label="증감 상세 검색"> <button class="btn" type="button" data-csv="bt">CSV</button></div></div>
+    <p class="hint">열 제목을 누르면 정렬됩니다. 행을 누르면 하위 단계로 내려갑니다. 기여도는 기준 기간 전체 수량 대비 증감(%p)입니다.</p>
+    <div class="tw"><table class="t" data-t="bt"><thead><tr><th data-f="항목">항목</th><th class="n" data-f="기준">기준</th><th class="n" data-f="비교">비교</th><th class="n" data-f="증감">증감</th><th class="n" data-f="증감률">증감률</th><th class="n" data-f="기여도">기여도</th></tr></thead><tbody></tbody></table></div>
+  </div>
+</section>
+
+<!-- 3. 품목별 -->
+<section class="sec" id="prod" style="margin-top:16px" hidden>
+  <div class="card" id="pd-card" hidden>
+    <div class="row"><h2 id="pd-title">—</h2><button type="button" class="btn" id="pd-close">닫기</button></div>
+    <div class="grid2">
+      <div><h3>월별 판매수량 (업태별)</h3><div class="chart" id="pd-month"></div></div>
+      <div><h3>선택 기간 판매 상위 점포 10곳</h3><div class="box" id="pd-stores"></div></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="row"><h2>품목별 실적</h2><div><input type="search" placeholder="상품명·품목군·코드 검색" data-q="pt" aria-label="품목 검색"> <button class="btn" type="button" data-csv="pt">CSV</button></div></div>
+    <p class="hint">열 제목을 누르면 오름차순·내림차순으로 정렬됩니다. 행을 누르면 위에 상품 상세가 열립니다. 추이의 음영은 선택 기간입니다.</p>
+    <div class="tw"><table class="t" data-t="pt"><thead><tr><th data-f="상품명">상품명</th><th data-f="품목군">품목군</th><th class="n" data-f="수량">판매수량</th><th class="n" data-f="비중">비중</th><th class="n" data-f="판매점포수">판매점포</th><th class="n" data-f="점포당월평균">점포당 월평균</th><th class="n" data-f="최근월수량">마지막 달</th><th class="n" data-f="전월대비">전월 대비</th><th>월별 추이</th></tr></thead><tbody></tbody></table></div>
+  </div>
+</section>
+
+<!-- 4. 점포별 -->
+<section class="sec" id="store" style="margin-top:16px" hidden>
+  <div class="kpis" id="tier-cards"></div>
+  <p class="hint">Tier는 업태마다 최근 12개월 판매수량 순위로 나눕니다(A 상위 20%, B 다음 30%, C 나머지). 카드를 누르면 그 Tier로 필터됩니다.</p>
+  <div class="card" id="sd-card" hidden>
+    <div class="row"><h2 id="sd-title">—</h2><button type="button" class="btn" id="sd-close">닫기</button></div>
+    <div class="grid2">
+      <div><h3>월별 판매수량</h3><div class="chart" id="sd-month"></div></div>
+      <div><h3>선택 기간 판매 상위 상품 10개</h3><div class="box" id="sd-prods"></div></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="row"><h2>점포별 실적</h2><div><input type="search" placeholder="점포명·업태·코드 검색" data-q="st" aria-label="점포 검색"> <button class="btn" type="button" data-csv="st">CSV</button></div></div>
+    <p class="hint">열 제목을 눌러 정렬하고, 행을 누르면 위에 점포 상세가 열립니다. 3개월 추세는 마지막 3개월 합계를 그 전 3개월과 비교한 값입니다.</p>
+    <div class="tw"><table class="t" data-t="st"><thead><tr><th data-f="점포명">점포명</th><th data-f="업태">업태</th><th class="c" data-f="Tier">Tier</th><th class="n" data-f="수량">판매수량</th><th class="n" data-f="비중">비중</th><th class="n" data-f="판매SKU수">판매 SKU</th><th class="n" data-f="SKU당월평균">SKU당 월평균</th><th class="n" data-f="최근월수량">마지막 달</th><th class="n" data-f="전월대비">전월 대비</th><th class="n" data-f="최근3개월추세">3개월 추세</th><th>월별 추이</th></tr></thead><tbody></tbody></table></div>
+  </div>
+</section>
+
+<!-- 5. 예측 -->
+<section class="sec" id="fc" style="margin-top:16px" hidden>
+  <div class="fc">
+    <div class="card">
+      <h2>시나리오 설정</h2>
+      <p class="hint" id="fc-base-note">—</p>
+      <label class="fld"><span>예측 방식</span><select id="fc-method"><option value="yoy">전년 동월 그대로</option><option value="run">최근 3개월 수준 유지</option><option value="trend">최근 12개월 추세 연장</option></select></label>
+      <p class="hint">전년 동월: 1년 전 같은 달 실적. 최근 3개월: 마지막 3개월 평균 수준에 월별 패턴을 입힘. 추세 연장: 업태별 선형 추세를 1년 더 이어감.</p>
+      <label class="fld"><span>기본 성장률 <b id="v-fG">0%</b></span><input type="range" min="-30" max="50" step="1" value="0" data-fp="fG"></label>
+      <label class="fld"><span>취급 점포 확대 <b id="v-fS">0%</b></span><input type="range" min="-20" max="30" step="1" value="0" data-fp="fS"></label>
+      <div class="sub"><h3>업태별 추가 조정</h3><div id="fc-adj"></div></div>
+      <div class="sub"><h3>행사 계획</h3>
+        <div class="fld"><span>행사 월 (눌러서 선택)</span><div class="chips" id="fc-chips"></div></div>
+        <label class="fld"><span>행사 월 판매 증가율 <b id="v-fPL">30%</b></span><input type="range" min="0" max="100" step="5" value="30" data-fp="fPL"></label>
+        <label class="fld"><span>행사 대상 품목군</span><select id="fc-pg"></select></label>
+      </div>
+      <div class="sub"><button type="button" class="btn" id="fc-reset">시나리오 초기화</button></div>
+    </div>
+    <div class="fc-out">
+      <div class="kpis">
+        <div class="card"><div class="k-l">예측 판매수량 (<span id="fk-win">—</span>)</div><div class="k-v" id="fk-total">—</div><div class="k-s">기준 실적 대비 <b id="fk-chg">—</b></div></div>
+        <div class="card"><div class="k-l">기준 실적 (<span id="fk-bwin">—</span>)</div><div class="k-v" id="fk-base">—</div><div class="k-s">차이 <b id="fk-diff">—</b>개</div></div>
+        <div class="card"><div class="k-l">예측 월평균</div><div class="k-v" id="fk-avg">—</div><div class="k-s">최대 판매월 <b id="fk-peak">—</b> · <span id="fk-peakq">—</span>개</div></div>
+      </div>
+      <div class="card"><h2>월별 기준 실적 vs 예측</h2><div class="legend" id="fc-legend"></div><div class="chart" id="fc-chart"></div></div>
+      <div class="card"><h2>기준 실적 → 예측 브리지</h2><p class="hint">각 시나리오 요인이 더하거나 뺀 판매수량입니다. 요인은 위에서부터 차례로 곱해 적용합니다.</p><div class="box" id="fc-wf"></div></div>
+      <div class="card"><div class="row"><h2>월별 예측표</h2><button class="btn" type="button" data-csv="fct">CSV</button></div>
+        <div class="tw"><table class="t" data-t="fct"><thead><tr><th data-f="예측월">예측월</th><th data-f="기준월">기준월</th><th class="n" data-f="기준실적">기준 실적</th><th class="n" data-f="예측">예측</th><th class="n" data-f="증감률">증감률</th></tr></thead><tbody></tbody></table></div></div>
+    </div>
+  </div>
+  <p class="note">상단의 업태·품목군·Tier 필터가 예측에도 적용됩니다. 기간 필터는 적용되지 않습니다(데이터의 마지막 12개월이 기준). 단순 시나리오 모델이라 계절성과 추세를 따로 추정하지 않습니다.</p>
+</section>
+
+<details class="defs" style="margin-top:16px">
+  <summary>지표 정의와 분류 기준</summary>
+  <ul>
+    <li><b>판매수량</b>: 이마트 POS 일별 판매수량 합계(반품은 음수로 차감).</li>
+    <li><b>품목군</b>: 상품명 기준으로 묶은 10개 그룹. 이마트 분류는 업태마다 달라 쓰지 않았습니다. 규칙은 index.html 의 groupOf() 와 scripts/build_data.py 의 group_of() 에 있습니다.</li>
+    <li><b>점포 Tier</b>: 업태마다 최근 12개월 판매수량 순위로 A(상위 20%), B(다음 30%), C(나머지).</li>
+    <li><b>취급 요인</b>: 점포×상품 조합 단위로, 기준 기간엔 없고 비교 기간에 팔린 것은 신규 취급, 반대는 취급 중단, 둘 다 팔린 것은 기존 취급 증가·감소.</li>
+    <li><b>점포수 효과 / 점당 효과</b>: (비교 점포수 − 기준 점포수) × 기준 점포당 수량, (비교 점포당 − 기준 점포당) × 비교 점포수. 두 값의 합이 전체 증감입니다.</li>
+    <li><b>예측</b>: 업태별로 예측 방식 → 기본 성장률 → 업태별 조정 → 점포 확대를 차례로 곱하고, 행사 월에는 대상 품목군 비중만큼 증가율을 더합니다.</li>
+  </ul>
+</details>
+</div>
+</div>
+
+<script>
+(function () {
+'use strict';
+// ════════════════ 공통 ════════════════
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => Array.from(document.querySelectorAll(s));
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+const setT = (id, v, sign) => { const e = document.getElementById(id); if (!e) return; e.textContent = v == null ? '—' : v; if (sign !== undefined) { e.classList.toggle('up', sign > 0); e.classList.toggle('down', sign < 0); } };
+const f0 = d3.format(',');
+const fin = (v) => v != null && Number.isFinite(+v);
+const N = (v) => (fin(v) ? f0(Math.round(v)) : '—');
+const SN = (v) => (fin(v) ? (v > 0 ? '+' : '') + f0(Math.round(v)) : '—');
+const PCT = (v) => (fin(v) ? (v > 0 ? '+' : '') + (+v).toFixed(1) + '%' : '—');
+const SHR = (v) => (fin(v) ? (+v).toFixed(1) + '%' : '—');
+const D1 = (v) => (fin(v) ? d3.format(',.1f')(v) : '—');
+const SHORT = (v) => { const a = Math.abs(v); if (a >= 10000) { const t = (v / 10000).toFixed(a >= 100000 ? 0 : 1); return (t.endsWith('.0') ? t.slice(0, -2) : t) + '만'; } return f0(Math.round(v)); };
+const r1 = (v) => Math.round(v * 10) / 10;
+const pctOf = (a, b) => (b > 0 ? r1(((a - b) / b) * 100) : null);
+const COL = (i) => 'var(--c' + (i % 7) + ')';
+
+const CH_ORDER = ['이마트', '노브랜드', '에브리데이', '트레이더스', '에브리데이B2B'];
+const GROUPS = ['인스턴트 커피', '원두', 'RTD 음료', '액상 에스프레소', '스테비아 커피믹스', '분말 아이스티·레몬', '진액차', '스테비아 차·라떼', '드립백', '필터·용품'];
+// scripts/build_data.py 의 group_of() 와 같은 규칙
+function groupOf(name) {
+  const n = String(name || '').replace(/\s/g, '');
+  if (n.includes('필터')) return '필터·용품';
+  if (n.includes('진액') || n.includes('보리차')) return '진액차';
+  if (/(1L|1\.5L|500ml|190ml)/i.test(n)) return 'RTD 음료';
+  if (n.includes('아이스티') || n.includes('레몬즙')) return '분말 아이스티·레몬';
+  if (n.includes('에스프레소샷') || n.includes('리얼에스프레소')) return '액상 에스프레소';
+  if (n.includes('커피믹스')) return '스테비아 커피믹스';
+  if (['핫초코', '유자차', '율무차', '쌍화차'].some((k) => n.includes(k))) return '스테비아 차·라떼';
+  if (n.includes('드립')) return '드립백';
+  if (['까페N블랙', '까페N헤이즐넛', '아이브루', '아이스블랙', '50g', '병커피'].some((k) => n.includes(k))) return '인스턴트 커피';
+  return '원두';
+}
+
+// ════════════════ 데이터 준비 ════════════════
+let D = null;
+const S = { tab: 'sum', m1: 0, m2: 0, ch: '', grp: '', tier: '', dMonth: -1, sGrp: '', bA: '', bB: '', bDim: 'ch', bPath: '', pSel: '', sSel: '',
+  fM: 'yoy', fG: 0, fS: 0, fA: {}, fPM: [], fPL: 30, fPG: '' };
+const memo = new Map();
+const M = (key, fn) => { if (!memo.has(key)) { if (memo.size > 80) memo.clear(); memo.set(key, fn()); } return memo.get(key); };
+
+function prepare(J) {
+  const months = J.months, chans = J.channels, groups = J.groups;
+  const stores = J.stores.map(([code, name, ci]) => ({ code: String(code), name, ch: chans[ci], total: 0, tier: 'C' }));
+  const products = J.products.map(([code, name, gi]) => ({ code: String(code), name, grp: groups[gi] }));
+  const rows = J.sales;
+  const n = months.length, t0 = Math.max(0, n - 12);
+  for (const [m, s, , q] of rows) if (m >= t0) stores[s].total += q;
+  const byCh = new Map();
+  stores.forEach((s, i) => { if (s.total > 0) { if (!byCh.has(s.ch)) byCh.set(s.ch, []); byCh.get(s.ch).push(i); } });
+  for (const list of byCh.values()) { list.sort((a, b) => stores[b].total - stores[a].total); const k1 = Math.ceil(list.length * 0.2), k2 = Math.ceil(list.length * 0.5); list.forEach((i, k) => { stores[i].tier = k < k1 ? 'A' : k < k2 ? 'B' : 'C'; }); }
+  const daily = J.daily.map(([d, ci, gi, q]) => [d, chans[ci], groups[gi], q]);
+  return { months, chans, groups, stores, products, rows, daily, generated: J.generated, files: J.source_files || [] };
+}
+const ymL = (i) => { const [y, m] = D.months[i].split('-'); return y + '년 ' + Number(m) + '월'; };
+const oneYear = () => new Set(D.months.map((x) => x.slice(0, 4))).size === 1;
+const ymS = (i) => { const [y, m] = D.months[i].split('-'); return oneYear() ? Number(m) + '월' : y.slice(2) + '.' + m; };
+const addYear = (ym) => (Number(ym.slice(0, 4)) + 1) + ym.slice(4);
+const winL = (a, b) => (a === b ? ymL(a) : ymL(a) + ' ~ ' + ymL(b).replace(/^(\d+)년 /, (s, y) => (D.months[a].slice(0, 4) === y ? '' : s)));
+
+function months() { let a = S.m1, b = S.m2; if (a > b) [a, b] = [b, a]; return [a, b]; }
+function pathTest(path) {
+  const conds = String(path || '').split('|').filter(Boolean).map((x) => { const i = x.indexOf('='); return [x.slice(0, i), x.slice(i + 1)]; });
+  if (!conds.length) return () => true;
+  const St = D.stores, P = D.products;
+  const tests = conds.map(([k, v]) => k === 'ch' ? (r) => St[r[1]].ch === v : k === 'grp' ? (r) => P[r[2]].grp === v : k === 'store' ? (r) => St[r[1]].code === v : k === 'prod' ? (r) => P[r[2]].code === v : () => true);
+  return (r) => tests.every((t) => t(r));
+}
+function filt(o, extra) {
+  const ch = o.ch || '', grp = o.grp || '', tier = o.tier || '';
+  return M(['f', ch, grp, tier, extra || ''].join('|'), () => {
+    const St = D.stores, P = D.products, ex = pathTest(extra);
+    return D.rows.filter((r) => (!ch || St[r[1]].ch === ch) && (!grp || P[r[2]].grp === grp) && (!tier || St[r[1]].tier === tier) && ex(r));
+  });
+}
+const F = () => ({ ch: S.ch, grp: S.grp, tier: S.tier });
+
+// ════════════════ 계산 ════════════════
+function calcKpi() {
+  const R = filt(F()); const [m1, m2] = months(); const L = m2 - m1 + 1; const n = D.months.length;
+  const byM = new Array(n).fill(0); const ss = new Set(), sk = new Set();
+  for (const [m, s, p, q] of R) { byM[m] += q; if (m >= m1 && m <= m2 && q > 0) { ss.add(s); sk.add(p); } }
+  const sum = (a, b) => { let t = 0; for (let m = a; m <= b; m++) t += byM[m]; return t; };
+  const total = sum(m1, m2); const prev = m1 - L >= 0 ? sum(m1 - L, m1 - 1) : null; const yoy = m1 - 12 >= 0 ? sum(m1 - 12, m2 - 12) : null;
+  const last = byM[m2], before = m2 > 0 ? byM[m2 - 1] : null;
+  return { total, avg: Math.round(total / L), prevPct: prev == null ? null : pctOf(total, prev), yoyPct: yoy == null ? null : pctOf(total, yoy), last, momPct: before == null ? null : pctOf(last, before), stores: ss.size, sku: sk.size, per: ss.size ? r1(total / ss.size / L) : 0 };
+}
+function calcMonthly() {
+  const R = filt(F()); const St = D.stores; const g = new Map();
+  for (const [m, s, , q] of R) { const k = m + '|' + St[s].ch; g.set(k, (g.get(k) || 0) + q); }
+  return g;
+}
+function calcDaily() {
+  if (S.dMonth < 0) return [];
+  const pre = D.months[S.dMonth] + '-'; const g = new Map();
+  for (const [d, ch, grp, q] of D.daily) { if (!d.startsWith(pre)) continue; if (S.ch && ch !== S.ch) continue; if (S.grp && grp !== S.grp) continue; g.set(d, (g.get(d) || 0) + q); }
+  const W = ['일', '월', '화', '수', '목', '금', '토'];
+  return [...g.keys()].sort().map((d) => ({ 일자: d, 요일: W[new Date(d + 'T00:00:00Z').getUTCDay()], 수량: g.get(d) }));
+}
+function calcByChannel() {
+  const R = filt({ ...F(), ch: '' }); const [m1, m2] = months(); const St = D.stores; const g = new Map(); let T = 0;
+  for (const [m, s, , q] of R) if (m >= m1 && m <= m2) { g.set(St[s].ch, (g.get(St[s].ch) || 0) + q); T += q; }
+  return [...g].map(([k, v]) => ({ 업태: k, 수량: v, 비중: T ? r1((v / T) * 100) : 0 })).sort((a, b) => b.수량 - a.수량);
+}
+function calcByGroup() {
+  const g0 = S.sGrp || S.grp || ''; const R = filt({ ...F(), grp: g0 }); const [m1, m2] = months(); const P = D.products; const g = new Map(); let T = 0;
+  for (const [m, , p, q] of R) if (m >= m1 && m <= m2) { const k = g0 ? P[p].code : P[p].grp; g.set(k, (g.get(k) || 0) + q); T += q; }
+  const name = new Map(P.map((x) => [x.code, x.name]));
+  return [...g].map(([k, v]) => ({ 키: k, 항목: g0 ? name.get(k) : k, 수량: v, 비중: T ? r1((v / T) * 100) : 0 })).sort((a, b) => b.수량 - a.수량);
+}
+
+// 기간 선택지(월·분기·반기·연)
+function periodOptions() {
+  return M('periods', () => {
+    const out = []; const ms = D.months;
+    ms.forEach((ym, i) => out.push({ v: 'r:' + i + ':' + i, l: ymL(i) }));
+    const groupBy = (keyFn, labelFn, min) => { const g = new Map(); ms.forEach((ym, i) => { const k = keyFn(ym); if (!g.has(k)) g.set(k, []); g.get(k).push(i); }); for (const [k, list] of g) if (list.length >= min) out.push({ v: 'r:' + list[0] + ':' + list[list.length - 1], l: labelFn(k) + (list.length < (k.includes('H') ? 6 : k.includes('Q') ? 3 : 12) ? ' (' + list.length + '개월)' : '') }); };
+    groupBy((ym) => ym.slice(0, 4) + 'Q' + Math.ceil(Number(ym.slice(5)) / 3), (k) => k.slice(0, 4) + '년 ' + k.slice(5) + '분기', 2);
+    groupBy((ym) => ym.slice(0, 4) + 'H' + (Number(ym.slice(5)) <= 6 ? 1 : 2), (k) => k.slice(0, 4) + '년 ' + (k.endsWith('1') ? '상반기' : '하반기'), 2);
+    groupBy((ym) => ym.slice(0, 4), (k) => k + '년 연간', 2);
+    return out;
+  });
+}
+const parsePeriod = (v) => { const [, a, b] = String(v).split(':').map(Number); return [a, b]; };
+const periodLabel = (v) => { const o = periodOptions().find((x) => x.v === v); return o ? o.l : '—'; };
+
+const NEXT = { ch: 'store', grp: 'prod', store: 'prod', prod: 'store' };
+function bridgeCore() {
+  const path = S.bPath, dim = S.bDim;
+  return M(['b', S.ch, S.grp, S.tier, path, dim, S.bA, S.bB].join('|'), () => {
+    const R = filt(F(), path); const [a1, a2] = parsePeriod(S.bA), [b1, b2] = parsePeriod(S.bB); const St = D.stores, P = D.products;
+    const kf = dim === 'ch' ? (r) => St[r[1]].ch : dim === 'grp' ? (r) => P[r[2]].grp : dim === 'store' ? (r) => St[r[1]].code : (r) => P[r[2]].code;
+    const lab = new Map(); if (dim === 'store') St.forEach((s) => lab.set(s.code, s.name)); if (dim === 'prod') P.forEach((x) => lab.set(x.code, x.name));
+    const agg = new Map(), pair = new Map(), sa = new Map(), sb = new Map(); let A = 0, B = 0;
+    for (const r of R) {
+      const m = r[0], q = r[3], inA = m >= a1 && m <= a2, inB = m >= b1 && m <= b2; if (!inA && !inB) continue;
+      const k = kf(r); let g = agg.get(k); if (!g) { g = { a: 0, b: 0 }; agg.set(k, g); }
+      const pk = r[1] * 100000 + r[2]; let pp = pair.get(pk); if (!pp) { pp = { a: 0, b: 0 }; pair.set(pk, pp); }
+      if (inA) { g.a += q; pp.a += q; A += q; sa.set(r[1], (sa.get(r[1]) || 0) + q); }
+      if (inB) { g.b += q; pp.b += q; B += q; sb.set(r[1], (sb.get(r[1]) || 0) + q); }
+    }
+    const fx = { new: { a: 0, b: 0 }, stop: { a: 0, b: 0 }, inc: { a: 0, b: 0 }, dec: { a: 0, b: 0 } };
+    for (const pp of pair.values()) { const d = pp.b - pp.a; const k = pp.a <= 0 && pp.b > 0 ? 'new' : pp.a > 0 && pp.b <= 0 ? 'stop' : d >= 0 ? 'inc' : 'dec'; fx[k].a += pp.a; fx[k].b += pp.b; }
+    let SA = 0, SB = 0; for (const v of sa.values()) if (v > 0) SA++; for (const v of sb.values()) if (v > 0) SB++;
+    const vA = SA ? A / SA : 0, vB = SB ? B / SB : 0;
+    const FXL = { new: '신규 취급 (점포·SKU)', stop: '취급 중단 (점포·SKU)', inc: '기존 취급 판매 증가', dec: '기존 취급 판매 감소' };
+    const items = dim === 'fx' ? Object.keys(fx).map((k) => ({ key: k, 항목: FXL[k], 기준: fx[k].a, 비교: fx[k].b })) : [...agg].map(([k, g]) => ({ key: k, 항목: lab.get(k) || k, 기준: g.a, 비교: g.b }));
+    const segs = path.split('|'); const hasStore = segs.some((x) => x.startsWith('store=')), hasProd = segs.some((x) => x.startsWith('prod='));
+    const next = dim === 'fx' ? null : NEXT[dim];
+    const canDrill = next && !(hasStore && hasProd) && !(next === 'store' && hasStore) && !(next === 'prod' && hasProd);
+    items.forEach((it) => { it.증감 = it.비교 - it.기준; it.증감률 = pctOf(it.비교, it.기준); it.기여도 = A > 0 ? r1((it.증감 / A) * 100) : null; it.drill = canDrill ? next : null; });
+    return { A, B, SA, SB, vA, vB, items, dim, eS: Math.round((SB - SA) * vA), eV: Math.round((vB - vA) * SB) };
+  });
+}
+function bridgeRows(c) {
+  let items = c.items.filter((x) => x.증감 !== 0 || c.dim === 'fx');
+  if (c.dim !== 'fx' && items.length > 9) {
+    const top = items.slice().sort((a, b) => Math.abs(b.증감) - Math.abs(a.증감)); const keep = top.slice(0, 8), rest = top.slice(8);
+    items = keep.concat([{ key: '', 항목: '기타 ' + rest.length + '개', 증감: rest.reduce((t, x) => t + x.증감, 0), drill: null }]);
+  }
+  if (c.dim !== 'fx') items = items.slice().sort((a, b) => (a.key === '' ? 1 : b.key === '' ? -1 : b.증감 - a.증감));
+  const out = [{ 항목: periodLabel(S.bA) + ' (기준)', 값: c.A, 유형: 'total', 시작: 0, 끝: c.A }];
+  let cum = c.A;
+  for (const it of items) { out.push({ 항목: it.항목, 값: it.증감, 유형: it.증감 >= 0 ? 'up' : 'down', 시작: cum, 끝: cum + it.증감, key: it.key, drill: it.drill }); cum += it.증감; }
+  out.push({ 항목: periodLabel(S.bB) + ' (비교)', 값: c.B, 유형: 'total', 시작: 0, 끝: c.B });
+  return out;
+}
+
+function calcProdTbl() {
+  const R = filt(F()); const [m1, m2] = months(); const L = m2 - m1 + 1; const P = D.products; const n = D.months.length; const by = new Map(); let T = 0;
+  for (const [m, s, p, q] of R) { let g = by.get(p); if (!g) { g = { q: 0, st: new Set(), tr: new Array(n).fill(0) }; by.set(p, g); } g.tr[m] += q; if (m >= m1 && m <= m2) { g.q += q; T += q; if (q > 0) g.st.add(s); } }
+  return [...by].filter(([, g]) => g.q !== 0).map(([i, g]) => { const last = g.tr[m2], prev = m2 > 0 ? g.tr[m2 - 1] : null;
+    return { 상품코드: P[i].code, 상품명: P[i].name, 품목군: P[i].grp, 수량: g.q, 비중: T ? r1((g.q / T) * 100) : 0, 판매점포수: g.st.size, 점포당월평균: g.st.size ? r1(g.q / g.st.size / L) : 0, 최근월수량: last, 전월대비: prev == null ? null : pctOf(last, prev), 추이: g.tr }; }).sort((a, b) => b.수량 - a.수량);
+}
+function calcStoreTbl() {
+  const R = filt(F()); const [m1, m2] = months(); const L = m2 - m1 + 1; const St = D.stores; const n = D.months.length; const by = new Map(); let T = 0;
+  for (const [m, s, p, q] of R) { let g = by.get(s); if (!g) { g = { q: 0, sk: new Set(), tr: new Array(n).fill(0) }; by.set(s, g); } g.tr[m] += q; if (m >= m1 && m <= m2) { g.q += q; T += q; if (q > 0) g.sk.add(p); } }
+  return [...by].filter(([, g]) => g.q !== 0).map(([i, g]) => { const last = g.tr[m2], prev = m2 > 0 ? g.tr[m2 - 1] : null; let trend = null;
+    if (m2 >= 5) { const a = g.tr[m2] + g.tr[m2 - 1] + g.tr[m2 - 2], b = g.tr[m2 - 3] + g.tr[m2 - 4] + g.tr[m2 - 5]; trend = pctOf(a, b); }
+    return { 점포코드: St[i].code, 점포명: St[i].name, 업태: St[i].ch, Tier: St[i].tier, 수량: g.q, 비중: T ? r1((g.q / T) * 100) : 0, 판매SKU수: g.sk.size, SKU당월평균: g.sk.size ? r1(g.q / g.sk.size / L) : 0, 최근월수량: last, 전월대비: prev == null ? null : pctOf(last, prev), 최근3개월추세: trend, 추이: g.tr }; }).sort((a, b) => b.수량 - a.수량);
+}
+function calcTier() {
+  const R = filt({ ...F(), tier: '' }); const [m1, m2] = months(); const St = D.stores;
+  const g = { A: { n: new Set(), q: 0 }, B: { n: new Set(), q: 0 }, C: { n: new Set(), q: 0 } }; let T = 0;
+  for (const [m, s, , q] of R) if (m >= m1 && m <= m2) { const t = g[St[s].tier]; t.q += q; T += q; if (q > 0) t.n.add(s); }
+  return ['A', 'B', 'C'].map((k) => ({ Tier: k, 점포수: g[k].n.size, 수량: g[k].q, 비중: T ? r1((g[k].q / T) * 100) : 0, 점포당월평균: g[k].n.size ? r1(g[k].q / g[k].n.size / (m2 - m1 + 1)) : 0 }));
+}
+function calcDetail(kind, code) {
+  const [m1, m2] = months(); const n = D.months.length; const St = D.stores, P = D.products;
+  if (kind === 'prod') {
+    const R = filt({ ...F(), grp: '' }, 'prod=' + code); const v = new Map(); const st = new Map();
+    for (const [m, s, , q] of R) { const k = m + '|' + St[s].ch; v.set(k, (v.get(k) || 0) + q); if (m >= m1 && m <= m2) st.set(s, (st.get(s) || 0) + q); }
+    return { v, top: [...st].sort((a, b) => b[1] - a[1]).slice(0, 10).map(([s, q]) => ({ label: St[s].name, value: q, ch: St[s].ch })) };
+  }
+  const R = filt({ ch: '', grp: S.grp, tier: '' }, 'store=' + code); const t = new Array(n).fill(0); const pr = new Map();
+  for (const [m, , p, q] of R) { t[m] += q; if (m >= m1 && m <= m2) pr.set(p, (pr.get(p) || 0) + q); }
+  return { t, top: [...pr].sort((a, b) => b[1] - a[1]).slice(0, 10).map(([p, q]) => ({ label: P[p].name, value: q })) };
+}
+
+// 예측: 데이터의 마지막 12개월(부족하면 전체)을 기준으로 다음 같은 기간을 예측
+function fcCore() {
+  return M(['fc', S.ch, S.grp, S.tier, S.fM, S.fG, S.fS, JSON.stringify(S.fA), S.fPM.join(','), S.fPL, S.fPG].join('|'), () => {
+    const n = D.months.length, Bn = Math.min(12, n), b0 = n - Bn; const R = filt(F()); const St = D.stores, P = D.products; const chans = D.chans;
+    const act = chans.map(() => new Array(Bn).fill(0)), actG = chans.map(() => new Array(Bn).fill(0));
+    for (const [m, s, p, q] of R) { if (m < b0) continue; const c = chans.indexOf(St[s].ch); act[c][m - b0] += q; if (!S.fPG || P[p].grp === S.fPG) actG[c][m - b0] += q; }
+    const g = S.fG / 100, sx = S.fS / 100, lift = S.fPL / 100; const pm = new Set(S.fPM);
+    const st = { base: 0, meth: 0, g: 0, adj: 0, s: 0, promo: 0 };
+    const mon = Array.from({ length: Bn }, (_, i) => ({ bi: b0 + i, a: 0, f: 0 }));
+    const xm = (Bn + 1) / 2;
+    act.forEach((a, c) => {
+      const tot = a.reduce((x, y) => x + y, 0); if (!tot) return; const mean = tot / Bn; let b1;
+      if (S.fM === 'run') { const k3 = a.slice(-3); const k = k3.reduce((x, y) => x + y, 0) / k3.length / mean; b1 = a.map((v) => v * k); }
+      else if (S.fM === 'trend') { let sxy = 0, sxx = 0; a.forEach((v, i) => { sxy += (i + 1 - xm) * (v - mean); sxx += (i + 1 - xm) ** 2; }); const beta = sxx ? sxy / sxx : 0; b1 = a.map((v) => Math.max(0, v + Bn * beta)); }
+      else b1 = a.slice();
+      const adj = (S.fA[chans[c]] || 0) / 100;
+      a.forEach((v, i) => {
+        const x1 = b1[i], x2 = x1 * (1 + g), x3 = x2 * (1 + adj), x4 = x3 * (1 + sx);
+        const cal = Number(D.months[b0 + i].slice(5)); const sh = v > 0 ? actG[c][i] / v : 0; const pr = pm.has(cal) ? x4 * sh * lift : 0;
+        st.base += v; st.meth += x1 - v; st.g += x2 - x1; st.adj += x3 - x2; st.s += x4 - x3; st.promo += pr; mon[i].a += v; mon[i].f += x4 + pr;
+      });
+    });
+    return { st, mon, b0, Bn };
+  });
+}
+
+// ════════════════ 차트 ════════════════
+function tip(host) {
+  const t = el('div', 'tip'); t.hidden = true; host.appendChild(t);
+  return { show(ev, lines) { t.replaceChildren(...lines.map((l, i) => el('div', i === 0 ? 'tip-h' : '', l))); t.hidden = false; const hb = host.getBoundingClientRect(); const w = t.offsetWidth, h = t.offsetHeight; let x = ev.clientX - hb.left + 14, y = ev.clientY - hb.top - h - 10; if (x + w > hb.width) x = Math.max(0, ev.clientX - hb.left - w - 14); if (y < 0) y = ev.clientY - hb.top + 16; t.style.left = x + 'px'; t.style.top = y + 'px'; }, hide() { t.hidden = true; } };
+}
+function columns(host, o) {
+  host.replaceChildren();
+  const W = Math.max(260, host.clientWidth || 600), H = o.H || 240;
+  const tot = o.xs.map((x) => o.keys.reduce((t, k) => t + Math.max(0, o.val(x, k.k) || 0), 0));
+  const y = d3.scaleLinear().domain([0, d3.max(tot) || 1]).nice(4).range([H - 22, 16]); const ticks = y.ticks(4);
+  const lm = 10 + d3.max(ticks, (t) => SHORT(t).length) * 7.5;
+  const x = d3.scaleBand().domain(o.xs).range([lm, W - 4]).padding(o.pad ?? 0.22);
+  const svg = d3.select(host).append('svg').attr('class', 'c').attr('width', W).attr('height', H).attr('role', 'img').attr('aria-label', o.label || '막대 차트');
+  const g = svg.append('g');
+  g.selectAll('line').data(ticks).join('line').attr('class', 'gridl').attr('x1', lm).attr('x2', W - 4).attr('y1', (d) => y(d)).attr('y2', (d) => y(d));
+  g.selectAll('text.yt').data(ticks).join('text').attr('class', 'tick yt').attr('x', lm - 6).attr('y', (d) => y(d)).attr('dy', '0.32em').attr('text-anchor', 'end').text((d) => SHORT(d));
+  const every = Math.ceil(o.xs.length / Math.max(1, Math.floor((W - lm) / 38)));
+  g.selectAll('text.xt').data(o.xs.filter((d, i) => i % every === 0)).join('text').attr('class', 'tick xt').attr('x', (d) => x(d) + x.bandwidth() / 2).attr('y', H - 6).attr('text-anchor', 'middle').text((d) => o.xl(d));
+  o.xs.forEach((xv, i) => {
+    let cum = 0;
+    o.keys.forEach((k) => { const v = Math.max(0, o.val(xv, k.k) || 0); if (!v) return;
+      g.append('rect').attr('x', x(xv)).attr('width', x.bandwidth()).attr('y', y(cum + v)).attr('height', Math.max(0, y(cum) - y(cum + v))).attr('rx', 1.5).style('fill', o.color ? o.color(xv, k.k) : k.color).style('opacity', o.dim && o.dim(xv) ? 0.28 : 1); cum += v; });
+    if (o.showTotals && x.bandwidth() >= 26 && tot[i] > 0) g.append('text').attr('class', 'vlab').attr('x', x(xv) + x.bandwidth() / 2).attr('y', y(tot[i]) - 4).attr('text-anchor', 'middle').style('opacity', o.dim && o.dim(xv) ? 0.4 : 1).text(SHORT(tot[i]));
+  });
+  const tp = tip(host); const step = x.step();
+  g.selectAll('rect.hit').data(o.xs).join('rect').attr('class', 'hit' + (o.onClick ? ' click' : '')).attr('x', (d) => x(d) - (step - x.bandwidth()) / 2).attr('width', step).attr('y', 0).attr('height', H - 18)
+    .on('pointermove', (ev, d) => tp.show(ev, o.tip(d))).on('pointerleave', () => tp.hide()).on('click', (ev, d) => { if (o.onClick) o.onClick(d); });
+}
+function paired(host, o) {
+  host.replaceChildren();
+  const W = Math.max(260, host.clientWidth || 600), H = o.H || 240;
+  const max = d3.max(o.xs, (d) => Math.max(o.a(d), o.b(d))) || 1;
+  const y = d3.scaleLinear().domain([0, max]).nice(4).range([H - 22, 10]); const ticks = y.ticks(4);
+  const lm = 10 + d3.max(ticks, (t) => SHORT(t).length) * 7.5;
+  const x = d3.scaleBand().domain(o.xs).range([lm, W - 4]).padding(0.2); const x2 = d3.scaleBand().domain(['a', 'b']).range([0, x.bandwidth()]).padding(0.08);
+  const svg = d3.select(host).append('svg').attr('class', 'c').attr('width', W).attr('height', H).attr('role', 'img').attr('aria-label', o.label);
+  svg.selectAll('line').data(ticks).join('line').attr('class', 'gridl').attr('x1', lm).attr('x2', W - 4).attr('y1', (d) => y(d)).attr('y2', (d) => y(d));
+  svg.selectAll('text.yt').data(ticks).join('text').attr('class', 'tick yt').attr('x', lm - 6).attr('y', (d) => y(d)).attr('dy', '0.32em').attr('text-anchor', 'end').text((d) => SHORT(d));
+  const every = Math.ceil(o.xs.length / Math.max(1, Math.floor((W - lm) / 38)));
+  svg.selectAll('text.xt').data(o.xs.filter((d, i) => i % every === 0)).join('text').attr('class', 'tick xt').attr('x', (d) => x(d) + x.bandwidth() / 2).attr('y', H - 6).attr('text-anchor', 'middle').text((d) => o.xl(d));
+  const g = svg.append('g');
+  o.xs.forEach((d) => {
+    g.append('rect').attr('x', x(d) + x2('a')).attr('width', x2.bandwidth()).attr('y', y(Math.max(0, o.a(d)))).attr('height', y(0) - y(Math.max(0, o.a(d)))).attr('rx', 1.5).style('fill', 'var(--chart-muted)');
+    g.append('rect').attr('x', x(d) + x2('b')).attr('width', x2.bandwidth()).attr('y', y(Math.max(0, o.b(d)))).attr('height', y(0) - y(Math.max(0, o.b(d)))).attr('rx', 1.5).style('fill', COL(0));
+  });
+  const tp = tip(host); const step = x.step();
+  svg.selectAll('rect.hit').data(o.xs).join('rect').attr('class', 'hit').attr('x', (d) => x(d) - (step - x.bandwidth()) / 2).attr('width', step).attr('y', 0).attr('height', H - 18).on('pointermove', (ev, d) => tp.show(ev, o.tip(d))).on('pointerleave', () => tp.hide());
+}
+function hbars(host, rows, o = {}) {
+  const max = d3.max(rows, (r) => Math.max(0, r.value)) || 1; const wrap = el('div', 'hb');
+  rows.forEach((r) => {
+    const on = o.active && o.active(r);
+    const row = el(o.onClick ? 'button' : 'div', 'hb-row' + (o.onClick ? ' click' : '') + (on ? ' on' : '') + (o.anyActive && !on ? ' off' : ''));
+    if (o.onClick) { row.type = 'button'; row.addEventListener('click', () => o.onClick(r)); }
+    const lab = el('span', 'hb-l', r.label); lab.title = r.label;
+    const tr = el('span', 'hb-t'); const b = el('span', 'hb-b'); b.style.width = (Math.max(0, r.value) / max) * 100 + '%'; b.style.background = r.color || COL(0); tr.append(b);
+    row.append(lab, tr, el('span', 'hb-v', r.text)); wrap.append(row);
+  });
+  host.replaceChildren(wrap);
+}
+function waterfall(host, rows, onClick) {
+  const cand = rows.flatMap((r) => (r.유형 === 'total' ? [r.끝] : [r.시작, r.끝]));
+  const hi = Math.max(0, d3.max(cand)), lo = Math.min(...cand); const span = hi - lo; let base = 0;
+  if (lo > 0 && span > 0 && span < hi * 0.5) base = Math.max(0, lo - span * 0.6);
+  if (lo < 0) base = lo;
+  const sc = (v) => ((v - base) / (hi - base || 1)) * 100; const wrap = el('div', 'wf');
+  rows.forEach((r) => {
+    const drill = onClick && r.drill;
+    const row = el(drill ? 'button' : 'div', 'wf-row ' + r.유형 + (drill ? ' click' : ''));
+    if (drill) { row.type = 'button'; row.addEventListener('click', () => onClick(r)); row.title = '하위 단계로 들어가기'; }
+    const lab = el('span', 'wf-l', r.항목 + (drill ? ' ›' : '')); lab.title = r.항목;
+    const tr = el('span', 'wf-t'); const b = el('span', 'wf-b');
+    const s = r.유형 === 'total' ? base : Math.min(r.시작, r.끝), e = r.유형 === 'total' ? r.끝 : Math.max(r.시작, r.끝);
+    b.style.left = sc(s) + '%'; b.style.width = Math.max(0.4, sc(e) - sc(s)) + '%';
+    b.style.background = r.유형 === 'total' ? COL(0) : r.유형 === 'up' ? 'var(--ok)' : 'var(--bad)'; tr.append(b);
+    row.append(lab, tr, el('span', 'wf-v ' + r.유형, r.유형 === 'total' ? N(r.끝) : SN(r.값))); wrap.append(row);
+  });
+  const parts = [wrap];
+  if (base > 0) parts.push(el('p', 'hint', '증감이 잘 보이도록 가로축을 ' + N(base) + '개부터 그렸습니다. 기준·비교 막대 길이는 실제 비율보다 짧게 보입니다.'));
+  host.replaceChildren(...parts);
+}
+function spark(arr, hi) {
+  const NS = 'http://www.w3.org/2000/svg'; const W = Math.max(76, Math.min(160, arr.length * 7)), H = 20;
+  const svg = document.createElementNS(NS, 'svg'); svg.setAttribute('width', W); svg.setAttribute('height', H); svg.setAttribute('role', 'img'); svg.setAttribute('aria-label', '월별 추이');
+  const max = Math.max(1, ...arr), min = Math.min(0, ...arr); const den = Math.max(1, arr.length - 1);
+  const pt = (v, i) => [2 + (i * (W - 4)) / den, H - 2 - ((v - min) / (max - min || 1)) * (H - 4)];
+  if (hi) { const r = document.createElementNS(NS, 'rect'); const x1 = pt(0, hi[0])[0] - 2, x2 = pt(0, hi[1])[0] + 2; r.setAttribute('x', x1); r.setAttribute('width', Math.max(2, x2 - x1)); r.setAttribute('y', 0); r.setAttribute('height', H); r.setAttribute('class', 'spark-hi'); svg.append(r); }
+  const pl = document.createElementNS(NS, 'polyline'); pl.setAttribute('points', arr.map((v, i) => pt(v, i).join(',')).join(' ')); pl.setAttribute('fill', 'none'); pl.style.stroke = COL(0); pl.setAttribute('stroke-width', '1.5'); svg.append(pl);
+  const [lx, ly] = pt(arr[arr.length - 1], arr.length - 1); const c = document.createElementNS(NS, 'circle'); c.setAttribute('cx', lx); c.setAttribute('cy', ly); c.setAttribute('r', 2); c.style.fill = COL(0); svg.append(c);
+  return svg;
+}
+function legend(host, items) { host.replaceChildren(...items.map((it) => { const s = el('span', 'lg'); const sw = el('i', 'sw'); sw.style.background = it.color; s.append(sw, document.createTextNode(it.label)); return s; })); }
+const chColor = (ch) => COL(Math.max(0, D.chans.indexOf(ch)));
+
+// ════════════════ 표 ════════════════
+const TS = {}; const TROWS = {};
+const tstate = (id) => (TS[id] = TS[id] || { key: null, dir: -1, q: '' });
+function table(id, rows, cols, o) {
+  const tb = document.querySelector('table[data-t="' + id + '"] tbody'); const st = tstate(id); let rs = rows;
+  if (st.q) { const q = st.q.toLowerCase(); rs = rs.filter((r) => o.search(r).toLowerCase().includes(q)); }
+  if (st.key) { const k = st.key, d = st.dir; rs = rs.slice().sort((a, b) => { const x = a[k], y = b[k]; if (x == null && y == null) return 0; if (x == null) return 1; if (y == null) return -1; return (typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y), 'ko')) * d; }); }
+  TROWS[id] = { rows: rs, cols };
+  const max = o.max || 800; const trs = rs.slice(0, max).map((r) => {
+    const tr = el('tr');
+    cols.forEach((c) => { const td = el('td', c.cls || ''); const v = c.render ? c.render(r) : c.fmt ? c.fmt(r[c.f]) : r[c.f]; if (v instanceof Node) td.append(v); else td.textContent = v == null || v === '' ? '—' : v;
+      if (c.sign) { const s = c.sign(r); if (s > 0) td.classList.add('up'); if (s < 0) td.classList.add('down'); } tr.append(td); });
+    if (o.onRow) { tr.tabIndex = 0; tr.classList.add('click'); tr.addEventListener('click', () => o.onRow(r)); tr.addEventListener('keydown', (e) => { if (e.key === 'Enter') o.onRow(r); }); }
+    if (o.sel && o.sel(r)) tr.classList.add('sel'); return tr;
+  });
+  if (!rs.length) { const tr = el('tr'); const td = el('td', 'empty', '조건에 맞는 항목이 없습니다.'); td.colSpan = cols.length; tr.append(td); trs.push(tr); }
+  if (rs.length > max) { const tr = el('tr'); const td = el('td', 'empty', '상위 ' + max + '개만 표시합니다. 검색으로 좁혀 보세요.'); td.colSpan = cols.length; tr.append(td); trs.push(tr); }
+  tb.replaceChildren(...trs);
+}
+function downloadCsv(id) {
+  const t = TROWS[id]; if (!t) return; const cols = t.cols.filter((c) => c.f);
+  const esc = (v) => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  const lines = [cols.map((c) => esc(c.f)).join(',')].concat(t.rows.map((r) => cols.map((c) => esc(r[c.f])).join(',')));
+  const blob = new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = id + '_' + D.months[months()[0]] + '_' + D.months[months()[1]] + '.csv'; document.body.append(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+}
+
+// ════════════════ 렌더 ════════════════
+function set(o) { Object.assign(S, o); render(); }
+function render() {
+  if (!D) return;
+  syncControls();
+  const k = calcKpi(); const byCh = calcByChannel(); const [m1, m2] = months();
+  $('#lede').hidden = false;
+  setT('l-period', winL(m1, m2)); setT('l-total', N(k.total)); setT('l-last', ymL(m2)); setT('l-mom', PCT(k.momPct), k.momPct);
+  setT('l-top', byCh[0] ? byCh[0].업태 : '—'); setT('l-share', byCh[0] ? SHR(byCh[0].비중) : '—');
+  ({ sum: renderSum, bridge: renderBridge, prod: renderProd, store: renderStore, fc: renderFc })[S.tab](k, byCh);
+}
+function syncControls() {
+  const [m1, m2] = months(); const sv = (id, v) => { const e = document.getElementById(id); if (e && document.activeElement !== e) e.value = String(v); };
+  sv('f-m1', m1); sv('f-m2', m2); sv('f-ch', S.ch); sv('f-grp', S.grp); sv('f-tier', S.tier); sv('b-a', S.bA); sv('b-b', S.bB); sv('fc-method', S.fM); sv('fc-pg', S.fPG);
+  $$('[data-tab]').forEach((b) => b.classList.toggle('on', b.dataset.tab === S.tab));
+  ['sum', 'bridge', 'prod', 'store', 'fc'].forEach((t) => { $('#' + t).hidden = t !== S.tab; });
+  $$('#b-dim [data-dim]').forEach((b) => b.classList.toggle('on', b.dataset.dim === S.bDim));
+  $$('#fc-chips [data-pm]').forEach((b) => b.classList.toggle('on', S.fPM.includes(Number(b.dataset.pm))));
+  $('#daily-card').hidden = S.dMonth < 0; $('#pd-card').hidden = !S.pSel; $('#sd-card').hidden = !S.sSel;
+  $('#f-reset').disabled = !(S.ch || S.grp || S.tier || m1 !== 0 || m2 !== D.months.length - 1);
+}
+
+function renderSum(k) {
+  const [m1, m2] = months();
+  setT('k-win', winL(m1, m2)); setT('k-total', N(k.total)); setT('k-prev', k.prevPct == null ? '비교 기간 없음' : PCT(k.prevPct), k.prevPct); setT('k-yoy', k.yoyPct == null ? '데이터 없음' : PCT(k.yoyPct), k.yoyPct);
+  setT('k-avg', N(k.avg)); setT('k-lastm', ymL(m2)); setT('k-last', N(k.last)); setT('k-mom', PCT(k.momPct), k.momPct);
+  setT('k-stores', N(k.stores)); setT('k-per', D1(k.per)); setT('k-sku', N(k.sku));
+  legend($('#ch-legend'), D.chans.map((c, i) => ({ label: c, color: COL(i) })));
+  const v = calcMonthly(); const xs = D.months.map((_, i) => i);
+  columns($('#trend'), { xs, keys: D.chans.map((c, i) => ({ k: c, color: COL(i) })), val: (x, kk) => v.get(x + '|' + kk) || 0, xl: ymS, showTotals: true, H: 260, label: '월별 업태별 판매수량 누적 막대', dim: (x) => x < m1 || x > m2,
+    tip: (x) => { const t = D.chans.reduce((s, c) => s + (v.get(x + '|' + c) || 0), 0); return [ymL(x) + ' · ' + N(t) + '개'].concat(D.chans.filter((c) => v.get(x + '|' + c)).map((c) => c + ' ' + N(v.get(x + '|' + c)))).concat(['눌러서 일별 보기']); },
+    onClick: (x) => set({ dMonth: x }) });
+  if (S.dMonth >= 0) {
+    setT('daily-title', ymL(S.dMonth)); const rows = calcDaily(); const host = $('#daily');
+    if (!rows.length) host.replaceChildren(el('p', 'hint', '이 달에는 조건에 맞는 판매가 없습니다.'));
+    else { const by = new Map(rows.map((r) => [r.일자, r]));
+      columns(host, { xs: rows.map((r) => r.일자), keys: [{ k: 'q' }], val: (x) => by.get(x).수량, xl: (x) => String(Number(x.slice(8))), H: 220, pad: 0.15, color: (x) => (['토', '일'].includes(by.get(x).요일) ? COL(0) : 'var(--chart-muted)'),
+        label: '일별 판매수량', tip: (x) => [Number(x.slice(5, 7)) + '월 ' + Number(x.slice(8)) + '일 (' + by.get(x).요일 + ')', N(by.get(x).수량) + '개'] }); }
+  }
+  hbars($('#ch-bars'), calcByChannel().map((r) => ({ label: r.업태, value: r.수량, text: N(r.수량) + ' · ' + SHR(r.비중), color: chColor(r.업태), key: r.업태 })),
+    { onClick: (r) => set({ ch: S.ch === r.key ? '' : r.key }), active: (r) => S.ch === r.key, anyActive: !!S.ch });
+  const g = S.sGrp || S.grp; const cr = $('#grp-crumb'); const root = el('button', '', '전체 품목군'); root.type = 'button'; root.disabled = !g || (!!S.grp && !S.sGrp); root.addEventListener('click', () => set({ sGrp: '' }));
+  cr.replaceChildren(root, ...(g ? [el('span', '', '›'), el('span', '', g)] : []));
+  const gr = calcByGroup(); const inGrp = !!g;
+  hbars($('#grp-bars'), gr.slice(0, inGrp ? 15 : 20).map((r) => ({ label: r.항목, value: r.수량, text: N(r.수량) + ' · ' + SHR(r.비중), key: r.키 })), inGrp ? {} : { onClick: (r) => set({ sGrp: r.key }) });
+  if (inGrp && gr.length > 15) $('#grp-bars').append(el('p', 'hint', '상위 15개 상품만 표시합니다.'));
+}
+
+const DIML = { ch: '업태', grp: '품목군', store: '점포', prod: '상품', fx: '취급 요인' };
+function drillTo(r) { if (!r.drill || !r.key) return; set({ bPath: (S.bPath ? S.bPath + '|' : '') + S.bDim + '=' + r.key, bDim: r.drill }); }
+function renderBridge() {
+  const c = bridgeCore();
+  setT('br-a', periodLabel(S.bA)); setT('br-b', periodLabel(S.bB)); setT('bk-al', periodLabel(S.bA)); setT('bk-bl', periodLabel(S.bB));
+  const d = c.B - c.A, dp = pctOf(c.B, c.A);
+  setT('br-d', SN(d) + '개', d); setT('br-p', PCT(dp), dp); setT('br-diml', DIML[S.bDim]);
+  const ups = c.items.filter((x) => x.증감 > 0).sort((a, b) => b.증감 - a.증감), downs = c.items.filter((x) => x.증감 < 0).sort((a, b) => a.증감 - b.증감);
+  setT('br-up', ups[0] ? ups[0].항목 + ' (' + SN(ups[0].증감) + ')' : '없음'); setT('br-down', downs[0] ? downs[0].항목 + ' (' + SN(downs[0].증감) + ')' : '없음');
+  setT('bk-a', N(c.A)); setT('bk-b', N(c.B)); setT('bk-d', SN(d), d); setT('bk-dp', PCT(dp), dp);
+  setT('bk-s', SN(c.eS), c.eS); setT('bk-sn', N(c.SA) + ' → ' + N(c.SB) + '곳'); setT('bk-v', SN(c.eV), c.eV); setT('bk-vn', D1(c.vA) + ' → ' + D1(c.vB) + '개');
+  // 경로
+  const path = String(S.bPath || '').split('|').filter(Boolean).map((x) => { const i = x.indexOf('='); return { k: x.slice(0, i), v: x.slice(i + 1) }; });
+  const nm = (p) => p.k === 'store' ? (D.stores.find((x) => x.code === p.v) || {}).name || p.v : p.k === 'prod' ? (D.products.find((x) => x.code === p.v) || {}).name || p.v : p.v;
+  const root = el('button', '', '전체'); root.type = 'button'; root.disabled = !path.length; root.addEventListener('click', () => set({ bPath: '', bDim: 'ch' }));
+  const parts = [root];
+  path.forEach((p, i) => { parts.push(el('span', '', '›')); const b = el('button', '', DIML[p.k] + ': ' + nm(p)); b.type = 'button'; b.disabled = i === path.length - 1;
+    b.addEventListener('click', () => set({ bPath: path.slice(0, i + 1).map((x) => x.k + '=' + x.v).join('|'), bDim: NEXT[p.k] })); parts.push(b); });
+  $('#br-crumb').replaceChildren(...parts);
+  waterfall($('#wf'), bridgeRows(c), drillTo);
+  table('bt', c.items, [{ f: '항목', cls: 'name' }, { f: '기준', fmt: N, cls: 'n' }, { f: '비교', fmt: N, cls: 'n' }, { f: '증감', fmt: SN, cls: 'n', sign: (r) => r.증감 }, { f: '증감률', fmt: PCT, cls: 'n', sign: (r) => r.증감률 }, { f: '기여도', fmt: PCT, cls: 'n', sign: (r) => r.기여도 }],
+    { search: (r) => r.항목, onRow: drillTo });
+}
+function renderProd() {
+  const hi = months();
+  table('pt', calcProdTbl(), [{ f: '상품명', cls: 'name' }, { f: '품목군' }, { f: '수량', fmt: N, cls: 'n' }, { f: '비중', fmt: SHR, cls: 'n' }, { f: '판매점포수', fmt: N, cls: 'n' }, { f: '점포당월평균', fmt: D1, cls: 'n' }, { f: '최근월수량', fmt: N, cls: 'n' }, { f: '전월대비', fmt: PCT, cls: 'n', sign: (r) => r.전월대비 }, { render: (r) => spark(r.추이, hi) }],
+    { search: (r) => r.상품명 + ' ' + r.품목군 + ' ' + r.상품코드, onRow: (r) => { set({ pSel: S.pSel === r.상품코드 ? '' : r.상품코드 }); $('#prod').scrollIntoView({ behavior: 'smooth', block: 'start' }); }, sel: (r) => r.상품코드 === S.pSel });
+  if (S.pSel) {
+    const p = D.products.find((x) => x.code === S.pSel); setT('pd-title', p ? p.name + ' · ' + p.grp : '—');
+    const d = calcDetail('prod', S.pSel); const [m1, m2] = months();
+    columns($('#pd-month'), { xs: D.months.map((_, i) => i), keys: D.chans.map((c, i) => ({ k: c, color: COL(i) })), val: (x, k) => d.v.get(x + '|' + k) || 0, xl: ymS, H: 220, showTotals: true, label: '선택 상품의 월별 업태별 판매수량', dim: (x) => x < m1 || x > m2,
+      tip: (x) => [ymL(x)].concat(D.chans.filter((c) => d.v.get(x + '|' + c)).map((c) => c + ' ' + N(d.v.get(x + '|' + c)))) });
+    if (d.top.length) hbars($('#pd-stores'), d.top.map((r) => ({ ...r, text: N(r.value), color: chColor(r.ch) }))); else $('#pd-stores').replaceChildren(el('p', 'hint', '선택 기간에 판매한 점포가 없습니다.'));
+  }
+}
+function renderStore() {
+  const hi = months(); const DESC = { A: '업태별 상위 20%', B: '다음 30%', C: '나머지 50%' };
+  $('#tier-cards').replaceChildren(...calcTier().map((r) => { const b = el('button', 'card tier' + (S.tier === r.Tier ? ' on' : '') + (S.tier && S.tier !== r.Tier ? ' off' : '')); b.type = 'button';
+    b.addEventListener('click', () => set({ tier: S.tier === r.Tier ? '' : r.Tier }));
+    b.append(el('div', 'k-l', 'Tier ' + r.Tier + ' · ' + DESC[r.Tier]), el('div', 'k-v', SHR(r.비중)), el('div', 'k-s', N(r.점포수) + '곳 · ' + N(r.수량) + '개 · 점포당 월 ' + D1(r.점포당월평균) + '개')); return b; }));
+  table('st', calcStoreTbl(), [{ f: '점포명', cls: 'name' }, { f: '업태' }, { f: 'Tier', cls: 'c' }, { f: '수량', fmt: N, cls: 'n' }, { f: '비중', fmt: SHR, cls: 'n' }, { f: '판매SKU수', fmt: N, cls: 'n' }, { f: 'SKU당월평균', fmt: D1, cls: 'n' }, { f: '최근월수량', fmt: N, cls: 'n' }, { f: '전월대비', fmt: PCT, cls: 'n', sign: (r) => r.전월대비 }, { f: '최근3개월추세', fmt: PCT, cls: 'n', sign: (r) => r.최근3개월추세 }, { render: (r) => spark(r.추이, hi) }],
+    { search: (r) => r.점포명 + ' ' + r.업태 + ' ' + r.점포코드, onRow: (r) => { set({ sSel: S.sSel === r.점포코드 ? '' : r.점포코드 }); $('#store').scrollIntoView({ behavior: 'smooth', block: 'start' }); }, sel: (r) => r.점포코드 === S.sSel });
+  if (S.sSel) {
+    const s = D.stores.find((x) => x.code === S.sSel); setT('sd-title', s ? s.name + ' · ' + s.ch + ' · Tier ' + s.tier : '—');
+    const d = calcDetail('store', S.sSel); const [m1, m2] = months();
+    columns($('#sd-month'), { xs: D.months.map((_, i) => i), keys: [{ k: 'q', color: COL(0) }], val: (x) => d.t[x], xl: ymS, H: 220, showTotals: true, label: '선택 점포의 월별 판매수량', dim: (x) => x < m1 || x > m2, tip: (x) => [ymL(x), N(d.t[x]) + '개'] });
+    if (d.top.length) hbars($('#sd-prods'), d.top.map((r) => ({ ...r, text: N(r.value) }))); else $('#sd-prods').replaceChildren(el('p', 'hint', '선택 기간에 판매한 상품이 없습니다.'));
+  }
+}
+function renderFc() {
+  const c = fcCore(); const fl = (i) => addYear(D.months[c.b0 + i]); const fL = (i) => { const [y, m] = fl(i).split('-'); return y + '년 ' + Number(m) + '월'; };
+  const bwin = winL(c.b0, c.b0 + c.Bn - 1); const fwin = fL(0) + ' ~ ' + fL(c.Bn - 1);
+  setT('fc-base-note', '기준 실적: ' + bwin + ' (' + c.Bn + '개월) → 예측: ' + fwin);
+  ['fG', 'fS'].forEach((k) => setT('v-' + k, (S[k] > 0 ? '+' : '') + S[k] + '%')); setT('v-fPL', S.fPL + '%');
+  $$('#fc-adj [data-ch]').forEach((b) => { const v = S.fA[b.dataset.ch] || 0; b.textContent = (v > 0 ? '+' : '') + v + '%'; });
+  const a = c.mon.reduce((t, x) => t + x.a, 0), f = c.mon.reduce((t, x) => t + x.f, 0); const pk = c.mon.reduce((b, x) => (x.f > b.f ? x : b), c.mon[0]);
+  const chg = pctOf(f, a);
+  setT('fk-win', fwin); setT('fk-bwin', bwin); setT('fk-total', N(f)); setT('fk-chg', PCT(chg), chg); setT('fk-base', N(a)); setT('fk-diff', SN(f - a), f - a); setT('fk-avg', N(f / c.Bn));
+  setT('fk-peak', pk ? fL(pk.bi - c.b0) : '—'); setT('fk-peakq', pk ? N(pk.f) : '—');
+  legend($('#fc-legend'), [{ label: '기준 실적', color: 'var(--chart-muted)' }, { label: '예측', color: COL(0) }]);
+  const xs = c.mon.map((_, i) => i);
+  paired($('#fc-chart'), { xs, a: (i) => c.mon[i].a, b: (i) => c.mon[i].f, xl: (i) => { const [y, m] = fl(i).split('-'); return oneYear() && c.Bn === 12 ? Number(m) + '월' : y.slice(2) + '.' + m; }, H: 250, label: '월별 기준 실적과 예측 비교',
+    tip: (i) => [fL(i), '기준(' + ymL(c.mon[i].bi) + ') ' + N(c.mon[i].a), '예측 ' + N(c.mon[i].f), '증감 ' + PCT(pctOf(c.mon[i].f, c.mon[i].a))] });
+  const s = c.st; const steps = [['예측 방식 보정', s.meth], ['기본 성장률', s.g], ['업태별 조정', s.adj], ['취급 점포 확대', s.s], ['행사 효과', s.promo]];
+  const rows = [{ 항목: '기준 실적', 값: s.base, 유형: 'total', 시작: 0, 끝: s.base }]; let cum = s.base;
+  for (const [k, v] of steps) { rows.push({ 항목: k, 값: v, 유형: v >= 0 ? 'up' : 'down', 시작: cum, 끝: cum + v }); cum += v; }
+  rows.push({ 항목: '예측', 값: cum, 유형: 'total', 시작: 0, 끝: cum });
+  waterfall($('#fc-wf'), rows);
+  table('fct', c.mon.map((x, i) => ({ 예측월: fl(i), 기준월: D.months[x.bi], 기준실적: Math.round(x.a), 예측: Math.round(x.f), 증감률: pctOf(x.f, x.a) })),
+    [{ f: '예측월' }, { f: '기준월' }, { f: '기준실적', fmt: N, cls: 'n' }, { f: '예측', fmt: N, cls: 'n' }, { f: '증감률', fmt: PCT, cls: 'n', sign: (r) => r.증감률 }], { search: (r) => r.예측월 });
+}
+
+// ════════════════ 컨트롤 ════════════════
+function buildControls() {
+  const opt = (v, l) => { const o = document.createElement('option'); o.value = v; o.textContent = l; return o; };
+  ['f-m1', 'f-m2'].forEach((id) => $('#' + id).replaceChildren(...D.months.map((_, i) => opt(i, ymL(i)))));
+  $('#f-ch').replaceChildren(opt('', '전체'), ...D.chans.map((c) => opt(c, c)));
+  $('#f-grp').replaceChildren(opt('', '전체'), ...D.groups.map((g) => opt(g, g)));
+  $('#fc-pg').replaceChildren(opt('', '전체 품목'), ...D.groups.map((g) => opt(g, g)));
+  const po = periodOptions(); ['b-a', 'b-b'].forEach((id) => $('#' + id).replaceChildren(...po.map((p) => opt(p.v, p.l))));
+  $('#fc-adj').replaceChildren(...D.chans.map((c) => { const lab = el('label', 'fld'); const sp = el('span'); const b = el('b', '', '0%'); b.dataset.ch = c; sp.append(document.createTextNode(c + ' '), b);
+    const r = document.createElement('input'); r.type = 'range'; r.min = -50; r.max = 50; r.step = 1; r.value = S.fA[c] || 0; r.dataset.fa = c; r.setAttribute('aria-label', c + ' 추가 조정(%)');
+    r.addEventListener('input', () => later({ fA: { ...S.fA, [c]: Number(r.value) } })); lab.append(sp, r); return lab; }));
+  $('#fc-chips').replaceChildren(...Array.from({ length: 12 }, (_, i) => { const b = el('button', 'chip', (i + 1) + '월'); b.type = 'button'; b.dataset.pm = i + 1;
+    b.addEventListener('click', () => { const m = i + 1; const cur = new Set(S.fPM); if (cur.has(m)) cur.delete(m); else cur.add(m); set({ fPM: [...cur].sort((a, b2) => a - b2) }); }); return b; }));
+  const n = D.months.length; const info = D.months[0] + ' ~ ' + D.months[n - 1] + ' · ' + n + '개월' + (D.generated ? ' · 생성 ' + D.generated.slice(0, 16).replace('T', ' ') : '');
+  $('#meta-info').textContent = '데이터: ' + info;
+}
+let raf = 0; const pend = {};
+function later(o) { Object.assign(pend, o); if (!raf) raf = requestAnimationFrame(() => { raf = 0; const x = { ...pend }; for (const k in pend) delete pend[k]; set(x); }); }
+function bindOnce() {
+  $$('[data-tab]').forEach((b) => b.addEventListener('click', () => { set({ tab: b.dataset.tab }); history.replaceState(null, '', '#' + b.dataset.tab); }));
+  $('#f-m1').addEventListener('change', (e) => set({ m1: Number(e.target.value) })); $('#f-m2').addEventListener('change', (e) => set({ m2: Number(e.target.value) }));
+  $('#f-ch').addEventListener('change', (e) => set({ ch: e.target.value })); $('#f-grp').addEventListener('change', (e) => set({ grp: e.target.value, sGrp: '' })); $('#f-tier').addEventListener('change', (e) => set({ tier: e.target.value }));
+  $('#f-reset').addEventListener('click', () => set({ m1: 0, m2: D.months.length - 1, ch: '', grp: '', tier: '', dMonth: -1, sGrp: '', bPath: '', pSel: '', sSel: '' }));
+  $('#b-a').addEventListener('change', (e) => set({ bA: e.target.value })); $('#b-b').addEventListener('change', (e) => set({ bB: e.target.value }));
+  $$('#b-dim [data-dim]').forEach((b) => b.addEventListener('click', () => set({ bDim: b.dataset.dim })));
+  $('#daily-close').addEventListener('click', () => set({ dMonth: -1 })); $('#pd-close').addEventListener('click', () => set({ pSel: '' })); $('#sd-close').addEventListener('click', () => set({ sSel: '' }));
+  $('#fc-method').addEventListener('change', (e) => set({ fM: e.target.value })); $('#fc-pg').addEventListener('change', (e) => set({ fPG: e.target.value }));
+  $$('input[data-fp]').forEach((r) => r.addEventListener('input', () => later({ [r.dataset.fp]: Number(r.value) })));
+  $('#fc-reset').addEventListener('click', () => { $$('input[data-fp]').forEach((r) => { r.value = r.dataset.fp === 'fPL' ? 30 : 0; }); $$('input[data-fa]').forEach((r) => { r.value = 0; }); set({ fM: 'yoy', fG: 0, fS: 0, fA: {}, fPM: [], fPL: 30, fPG: '' }); });
+  $$('table[data-t]').forEach((tbl) => { const id = tbl.dataset.t; tbl.querySelectorAll('th[data-f]').forEach((th) => th.addEventListener('click', () => {
+    const st = tstate(id), k = th.dataset.f; if (st.key === k) st.dir = -st.dir; else { st.key = k; st.dir = th.classList.contains('n') ? -1 : 1; }
+    tbl.querySelectorAll('th').forEach((h) => h.classList.remove('asc', 'desc')); th.classList.add(st.dir > 0 ? 'asc' : 'desc'); render(); })); });
+  $$('input[data-q]').forEach((inp) => inp.addEventListener('input', () => { tstate(inp.dataset.q).q = inp.value.trim(); render(); }));
+  $$('[data-csv]').forEach((b) => b.addEventListener('click', () => downloadCsv(b.dataset.csv)));
+  let rt = 0; window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(render, 150); });
+  window.addEventListener('beforeprint', () => ['sum', 'bridge', 'prod', 'store', 'fc'].forEach((t) => { $('#' + t).hidden = false; }));
+  window.addEventListener('afterprint', render);
+}
+function start(J) {
+  D = prepare(J); memo.clear();
+  const n = D.months.length;
+  Object.assign(S, { m1: 0, m2: n - 1, ch: '', grp: '', tier: '', dMonth: -1, sGrp: '', bPath: '', bDim: 'ch', pSel: '', sSel: '',
+    bA: 'r:' + Math.max(0, n - 2) + ':' + Math.max(0, n - 2), bB: 'r:' + (n - 1) + ':' + (n - 1) });
+  const h = location.hash.replace('#', ''); if (['sum', 'bridge', 'prod', 'store', 'fc'].includes(h)) S.tab = h;
+  buildControls(); $('#loader').hidden = true; $('#main').hidden = false; render();
+}
+
+// ════════════════ 엑셀 직접 읽기 (서버 없이 열었을 때) ════════════════
+async function readZip(buf) {
+  const dv = new DataView(buf); let e = buf.byteLength - 22;
+  while (e >= 0 && dv.getUint32(e, true) !== 0x06054b50) e--;
+  if (e < 0) throw new Error('xlsx(zip) 형식이 아닙니다');
+  const cnt = dv.getUint16(e + 10, true); let p = dv.getUint32(e + 16, true); const files = {}; const dec = new TextDecoder();
+  for (let i = 0; i < cnt; i++) {
+    if (dv.getUint32(p, true) !== 0x02014b50) break;
+    const method = dv.getUint16(p + 10, true), csize = dv.getUint32(p + 20, true), nlen = dv.getUint16(p + 28, true), xlen = dv.getUint16(p + 30, true), clen = dv.getUint16(p + 32, true), loff = dv.getUint32(p + 42, true);
+    files[dec.decode(new Uint8Array(buf, p + 46, nlen))] = { method, csize, loff }; p += 46 + nlen + xlen + clen;
+  }
+  return { names: Object.keys(files), async text(name) { const f = files[name]; if (!f) return null; const nl = dv.getUint16(f.loff + 26, true), xl = dv.getUint16(f.loff + 28, true);
+    const data = new Uint8Array(buf, f.loff + 30 + nl + xl, f.csize); if (f.method === 0) return dec.decode(data);
+    const out = await new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer(); return dec.decode(out); } };
+}
+const unesc = (s) => s.replace(/&(lt|gt|amp|quot|apos|#\d+|#x[0-9a-fA-F]+);/g, (m, g) => g === 'lt' ? '<' : g === 'gt' ? '>' : g === 'amp' ? '&' : g === 'quot' ? '"' : g === 'apos' ? "'" : String.fromCodePoint(g[1] === 'x' ? parseInt(g.slice(2), 16) : parseInt(g.slice(1), 10)));
+const tText = (s) => unesc([...s.matchAll(/<t(?:\s[^>]*)?>([\s\S]*?)<\/t>/g)].map((x) => x[1]).join(''));
+const colIdx = (ref) => { let n = 0; for (const ch of ref) n = n * 26 + ch.charCodeAt(0) - 64; return n - 1; };
+async function readXlsx(file) {
+  const z = await readZip(await file.arrayBuffer());
+  const sheet = z.names.filter((n) => /^xl\/worksheets\/sheet\d+\.xml$/.test(n)).sort((a, b) => parseInt(a.match(/\d+/)) - parseInt(b.match(/\d+/)))[0];
+  if (!sheet) throw new Error('시트를 찾지 못했습니다');
+  const sst = await z.text('xl/sharedStrings.xml'); const ss = sst ? [...sst.matchAll(/<si>([\s\S]*?)<\/si>/g)].map((m) => tText(m[1])) : [];
+  const xml = await z.text(sheet); const rows = [];
+  for (const rm of xml.matchAll(/<row\b[^>]*>([\s\S]*?)<\/row>/g)) {
+    const row = [];
+    for (const cm of rm[1].matchAll(/<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
+      const attrs = cm[1], inner = cm[2] || ''; const ref = (attrs.match(/\br="([A-Z]+)\d+"/) || [])[1]; if (!ref) continue; const t = (attrs.match(/\bt="([^"]+)"/) || [])[1];
+      let v = null;
+      if (t === 'inlineStr') v = tText(inner);
+      else { const vm = inner.match(/<v>([\s\S]*?)<\/v>/); if (vm) v = t === 's' ? ss[Number(vm[1])] : t === 'str' || t === 'e' ? unesc(vm[1]) : t === 'b' ? vm[1] === '1' : Number(vm[1]); }
+      row[colIdx(ref)] = v;
+    }
+    rows.push(row);
+  }
+  return rows;
+}
+const txt = (v) => (v == null ? '' : String(v).trim().split(/\s+/).join(' '));
+function buildJson(recs) {
+  recs.sort((a, b) => a.ym.localeCompare(b.ym)); const byYm = new Map(); recs.forEach((r) => byYm.set(r.ym, r)); const list = [...byYm.values()];
+  const months = list.map((r) => r.ym); const stores = new Map(), prods = new Map(), sales = new Map(), daily = new Map();
+  list.forEach((rec, mi) => {
+    const hdr = rec.rows[0].map(txt); const idx = Object.fromEntries(hdr.map((h, i) => [h, i]));
+    for (const h of ['업태명', '점포코드', '점포명', '상품코드', '상품명']) if (!(h in idx)) throw new Error(rec.name + ': 열 "' + h + '" 이 없습니다');
+    const days = []; hdr.forEach((h, i) => { const m = h.match(/^(\d{1,2})월(\d{1,2})일$/); if (m) days.push([i, Number(m[2])]); });
+    for (let k = 1; k < rec.rows.length; k++) {
+      const r = rec.rows[k]; const st = txt(r[idx['점포코드']]), pc = txt(r[idx['상품코드']]); if (!st || !pc) continue;
+      const ch = txt(r[idx['업태명']]), name = txt(r[idx['상품명']]); stores.set(st, [txt(r[idx['점포명']]), ch]); prods.set(pc, name); const g = groupOf(name); let qs = 0;
+      for (const [ci, d] of days) { const v = Number(r[ci]) || 0; if (v) { qs += v; const key = rec.ym + '-' + String(d).padStart(2, '0') + '|' + ch + '|' + g; daily.set(key, (daily.get(key) || 0) + v); } }
+      if (qs) { const key = mi + '|' + st + '|' + pc; sales.set(key, (sales.get(key) || 0) + qs); }
+    }
+  });
+  const allCh = [...new Set([...stores.values()].map((v) => v[1]))]; const chans = CH_ORDER.filter((c) => allCh.includes(c)).concat(allCh.filter((c) => !CH_ORDER.includes(c)).sort());
+  const ci = new Map(chans.map((c, i) => [c, i])), gi = new Map(GROUPS.map((g, i) => [g, i]));
+  const stc = [...stores.keys()].sort(), prc = [...prods.keys()].sort(); const si = new Map(stc.map((c, i) => [c, i])), pi = new Map(prc.map((c, i) => [c, i]));
+  return { version: 1, generated: new Date().toISOString(), source_files: list.map((r) => r.name), months, channels: chans, groups: GROUPS,
+    stores: stc.map((c) => [c, stores.get(c)[0], ci.get(stores.get(c)[1])]), products: prc.map((c) => [c, prods.get(c), gi.get(groupOf(prods.get(c)))]),
+    sales: [...sales].map(([k, q]) => { const [m, s, p] = k.split('|'); return [Number(m), si.get(s), pi.get(p), q]; }).sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2]),
+    daily: [...daily].map(([k, q]) => { const [d, c, g] = k.split('|'); return [d, ci.get(c), gi.get(g), q]; }).sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : a[1] - b[1] || a[2] - b[2])) };
+}
+async function loadFiles(fileList) {
+  const files = [...fileList]; const status = $('#load-status'); const log = (s) => { status.textContent += s + '\n'; };
+  status.textContent = ''; $('#loader').hidden = false;
+  try {
+    const json = files.find((f) => /\.json$/i.test(f.name));
+    if (json) { log('JSON 읽는 중: ' + json.name); start(JSON.parse(await json.text())); return; }
+    const recs = [];
+    for (const f of files.filter((x) => /\.xlsx$/i.test(x.name)).sort((a, b) => a.name.localeCompare(b.name))) {
+      let ym = (f.name.match(/(20\d{2})(0[1-9]|1[0-2])/) || []).slice(1).join('-');
+      log('읽는 중: ' + f.name); const rows = await readXlsx(f);
+      if (!ym) { const hm = (rows[0] || []).map(txt).find((h) => /^\d{1,2}월\d{1,2}일$/.test(h)); const y = window.prompt(f.name + ' 의 연도를 입력하세요 (파일명에 연월이 없습니다)', String(new Date().getFullYear())); if (!hm || !y) { log('  건너뜀'); continue; } ym = y + '-' + String(parseInt(hm)).padStart(2, '0'); }
+      recs.push({ ym, name: f.name, rows }); log('  → ' + ym + ', ' + (rows.length - 1).toLocaleString() + '행');
+    }
+    if (!recs.length) { log('읽을 수 있는 엑셀이 없습니다.'); return; }
+    start(buildJson(recs));
+  } catch (err) { log('오류: ' + err.message); }
+}
+
+// 시작: data/pos_data.json → 실패하면 파일 불러오기 화면
+bindOnce();
+const fileIn = $('#file-in');
+$('#open-files').addEventListener('click', () => fileIn.click()); $('#pick').addEventListener('click', () => fileIn.click());
+fileIn.addEventListener('change', () => { if (fileIn.files.length) loadFiles(fileIn.files); fileIn.value = ''; });
+const drop = $('#drop');
+['dragenter', 'dragover'].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.add('over'); }));
+['dragleave', 'drop'].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', (e) => { if (e.dataTransfer.files.length) loadFiles(e.dataTransfer.files); });
+fetch('data/pos_data.json', { cache: 'no-cache' }).then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); }).then(start)
+  .catch(() => { $('#loader').hidden = false; $('#meta-info').textContent = '데이터 파일 없음'; });
+})();
+</script>
+</body>
+</html>
