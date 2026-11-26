@@ -126,6 +126,17 @@ details.defs li { margin: 4px 0; line-height: 1.6; }
 .drop.over { border-color: var(--c0); color: var(--fg); }
 .warn { color: var(--bad); }
 .seg button:disabled { opacity: .4; cursor: default; }
+.ins-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; margin-top: 10px; }
+.ins-card { background: var(--bg); border: 1px solid var(--line); border-left: 4px solid var(--line); border-radius: var(--r); padding: 14px; display: flex; flex-direction: column; gap: 6px; }
+.ins-card.sev-h { border-left-color: var(--bad); } .ins-card.sev-m { border-left-color: var(--c4); } .ins-card.strat { border-left-color: var(--ok); }
+.ins-h { display: flex; gap: 8px; align-items: baseline; font-size: 14px; line-height: 1.4; }
+.tag { font-size: 11px; padding: 1px 8px; border-radius: 10px; white-space: nowrap; color: #fff; }
+.tag-h { background: var(--bad); } .tag-m { background: var(--c4); } .tag-l { background: var(--muted); }
+.ins-imp { font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.ins-t { margin: 0; font-size: 13px; line-height: 1.6; }
+.ins-sub { font-size: 12px; color: var(--muted); font-weight: 600; margin-top: 4px; }
+.ins-card ul { margin: 0; padding-left: 18px; font-size: 12px; line-height: 1.7; color: var(--fg); }
+.ins-card .btn { align-self: flex-start; margin-top: 4px; }
 .status { font-size: 12px; color: var(--muted); white-space: pre-line; }
 @media print {
   .filters { position: static; } .tabs, .btn, input[type=search] { display: none !important; }
@@ -173,6 +184,7 @@ details.defs li { margin: 4px 0; line-height: 1.6; }
   <button type="button" class="tab" data-tab="prod">3. 품목별 실적</button>
   <button type="button" class="tab" data-tab="store">4. 점포별 실적</button>
   <button type="button" class="tab" data-tab="fc">5. 예측 시뮬레이션</button>
+  <button type="button" class="tab" data-tab="ins">6. 페인포인트·성장 전략</button>
 </nav>
 
 <!-- 1. 매출 종합 -->
@@ -302,6 +314,30 @@ details.defs li { margin: 4px 0; line-height: 1.6; }
   <p class="note">상단의 업태·품목군·Tier 필터와 차트 기준(매출/수량)이 예측에 적용됩니다. 기간 필터는 적용되지 않습니다(그 기준의 자료가 있는 마지막 12개월이 기준). 단순 시나리오 모델이라 계절성과 추세를 따로 추정하지 않습니다.</p>
 </section>
 
+<!-- 6. 페인포인트·성장 전략 -->
+<section class="sec" id="ins" style="margin-top:16px" hidden>
+  <div class="card">
+    <h2>분석 기준</h2>
+    <p class="hint" id="ins-basis">—</p>
+    <label class="fld" style="max-width:380px"><span>전략 실현율 (기회 금액 계산에 적용) <b id="v-insR">30%</b></span><input type="range" min="10" max="100" step="5" value="30" id="ins-r" aria-label="전략 실현율"></label>
+    <p class="hint">데이터가 바뀌면 진단과 전략도 자동으로 다시 계산됩니다. 상단 차트·비중 기준(매출/수량)을 따릅니다.</p>
+  </div>
+  <div class="kpis" id="ins-kpis"></div>
+  <div class="card"><h2>페인포인트</h2><p class="hint">영향이 큰 순서입니다. 영향은 비교 기간 대비 줄어든 금액을 1년치로 환산한 값입니다.</p><div class="ins-grid" id="ins-pain"></div></div>
+  <div class="card"><h2>매출 성장 전략</h2><p class="hint">기회 금액 = 100% 달성 시 연간 증가분 × 실현율. ①~③은 서로 겹치지 않게 계산했습니다.</p><div class="ins-grid" id="ins-strat"></div></div>
+  <div class="card"><h2>성장 기회 브리지 (연간)</h2><div class="box" id="ins-wf"></div></div>
+  <div class="card" id="ins-ws">
+    <div class="row"><h2>취급 확대 후보 (화이트 스페이스)</h2><div><input type="search" placeholder="상품·업태 검색" data-q="ws" aria-label="취급 확대 후보 검색"> <button class="btn" type="button" data-csv="ws">CSV</button></div></div>
+    <p class="hint">최근 3개월 기준, 같은 업태 점포의 30~90%가 이미 팔고 있는 상품입니다. 연 기회 = 미취급 점포 수 × 취급점 월평균 × 12. 행을 누르면 그 상품 상세로 이동합니다.</p>
+    <div class="tw"><table class="t" data-t="ws"><thead></thead><tbody></tbody></table></div>
+  </div>
+  <div class="card" id="ins-dq">
+    <div class="row"><h2>데이터 점검</h2><button class="btn" type="button" data-csv="dq">CSV</button></div>
+    <p class="hint">월별로 수량 파일과 금액 파일이 서로 맞는지 확인합니다. 불일치 비율이 3%를 넘거나 같은 상품의 단가가 전월보다 20% 넘게 바뀌면 표시합니다.</p>
+    <div class="tw"><table class="t" data-t="dq"><thead></thead><tbody></tbody></table></div>
+  </div>
+</section>
+
 <details class="defs" style="margin-top:16px">
   <summary>지표 정의와 분류 기준</summary>
   <ul>
@@ -313,6 +349,7 @@ details.defs li { margin: 4px 0; line-height: 1.6; }
     <li><b>취급 요인</b>: 점포×상품 조합 단위로, 기준 기간엔 없고 비교 기간에 팔린 것은 신규 취급, 반대는 취급 중단, 둘 다 팔린 것은 기존 취급 증가·감소.</li>
     <li><b>수량 효과 / 단가 효과</b>: (비교 수량 − 기준 수량) × 기준 단가, (비교 단가 − 기준 단가) × 비교 수량. 두 값의 합이 매출 증감입니다.</li>
     <li><b>점포수 효과 / 점당 효과</b>: (비교 점포수 − 기준 점포수) × 기준 점포당 값, (비교 점포당 − 기준 점포당) × 비교 점포수. 두 값의 합이 전체 증감입니다.</li>
+    <li><b>페인포인트·전략</b>: 이탈 점포·판매 중단 SKU는 비교 기간에 팔렸지만 최근 3개월 판매가 없는 경우, 부진 점포는 30% 이상, 역성장 SKU는 10% 이상 감소한 경우입니다. 취급 확대 후보는 같은 업태 점포의 30~90%가 파는 상품입니다.</li>
     <li><b>예측</b>: 업태별로 예측 방식 → 기본 성장률 → 업태별 조정 → 점포 확대를 차례로 곱하고, 행사 월에는 대상 품목군 비중만큼 증가율을 더합니다.</li>
   </ul>
 </details>
@@ -371,7 +408,7 @@ function groupOf(name) {
 // ════════════════ 데이터 준비 ════════════════
 let D = null;
 const S = { tab: 'sum', ms: 'qty', m1: 0, m2: 0, ch: '', grp: '', tier: '', dMonth: -1, sGrp: '', bA: '', bB: '', bDim: 'ch', bPath: '', pSel: '', sSel: '',
-  fM: 'yoy', fG: 0, fS: 0, fA: {}, fPM: [], fPL: 30, fPG: '' };
+  fM: 'yoy', fG: 0, fS: 0, fA: {}, fPM: [], fPL: 30, fPG: '', insR: 30 };
 const memo = new Map();
 const M = (key, fn) => { const k = S.ms + '#' + key; if (!memo.has(k)) { if (memo.size > 120) memo.clear(); memo.set(k, fn()); } return memo.get(k); };
 
@@ -767,13 +804,13 @@ function render() {
   const aIdx = D.months.map((_, i) => i).filter((i) => D.hasA[i]); const cov = $('#cov');
   if (aIdx.length === D.months.length) cov.hidden = true;
   else { cov.hidden = false; cov.textContent = aIdx.length ? '매출(금액) 자료가 있는 달: ' + listYm(aIdx) + ' (' + aIdx.length + '/' + D.months.length + '개월). 나머지 달은 수량만 있어 매출이 비어 있습니다. data/raw 에 그 달 금액 파일을 올리면 채워집니다.' : '아직 금액 파일이 없어 매출은 비어 있습니다. data/raw 에 금액 파일(파일명에 "금액" 또는 "amount" 포함)을 올리면 채워집니다.'; }
-  ({ sum: renderSum, bridge: renderBridge, prod: renderProd, store: renderStore, fc: renderFc })[S.tab](k, byCh);
+  ({ sum: renderSum, bridge: renderBridge, prod: renderProd, store: renderStore, fc: renderFc, ins: renderIns })[S.tab](k, byCh);
 }
 function syncControls() {
   const [m1, m2] = months(); const sv = (id, v) => { const e = document.getElementById(id); if (e && document.activeElement !== e) e.value = String(v); };
   sv('f-m1', m1); sv('f-m2', m2); sv('f-ch', S.ch); sv('f-grp', S.grp); sv('f-tier', S.tier); sv('b-a', S.bA); sv('b-b', S.bB); sv('fc-method', S.fM); sv('fc-pg', S.fPG);
   $$('[data-tab]').forEach((x) => x.classList.toggle('on', x.dataset.tab === S.tab));
-  ['sum', 'bridge', 'prod', 'store', 'fc'].forEach((t) => { $('#' + t).hidden = t !== S.tab; });
+  ['sum', 'bridge', 'prod', 'store', 'fc', 'ins'].forEach((t) => { $('#' + t).hidden = t !== S.tab; });
   $$('#b-dim [data-dim]').forEach((x) => x.classList.toggle('on', x.dataset.dim === S.bDim));
   $$('#ms [data-ms]').forEach((x) => { x.classList.toggle('on', x.dataset.ms === S.ms); x.disabled = x.dataset.ms === 'amt' && !D.hasA.some(Boolean); });
   $$('#fc-chips [data-pm]').forEach((x) => x.classList.toggle('on', S.fPM.includes(Number(x.dataset.pm))));
@@ -918,6 +955,168 @@ function renderFc() {
     [{ f: '예측월', l: '예측월' }, { f: '기준월', l: '기준월' }, { f: '기준실적', l: '기준 실적' + u, fmt: N, cls: 'n' }, { f: '예측', l: '예측' + u, fmt: N, cls: 'n' }, { f: '증감률', l: '증감률', fmt: PCT, cls: 'n', sign: (r) => r.증감률 }], { search: (r) => r.예측월 });
 }
 
+// ════════════════ 6. 페인포인트·성장 전략 ════════════════
+// 비교 창: 15개월 이상이면 최근 K개월(최대 12) vs 전년 동기, 아니면 최근 절반 vs 직전 절반
+function insWindows() {
+  const n = D.months.length;
+  if (n >= 15) { const K = Math.min(12, n - 12); return { A: [n - K - 12, n - 13], B: [n - K, n - 1], K, yoy: true }; }
+  const L = Math.max(1, Math.floor(n / 2)); return { A: [n - 2 * L, n - L - 1], B: [n - L, n - 1], K: L, yoy: false };
+}
+const winTxt = (w) => winL(w.B[0], w.B[1]) + ' vs ' + (w.yoy ? '전년 동기' : '직전 기간') + '(' + winL(w.A[0], w.A[1]) + ')';
+function calcQuality() {
+  if (calcQuality.d === D) return calcQuality.c;
+  const n = D.months.length; const rows = new Array(n).fill(0), mis = new Array(n).fill(0), Q = new Array(n).fill(0), A = new Array(n).fill(0);
+  const pp = Array.from({ length: n }, () => new Map());
+  for (const r of D.rows) {
+    const m = r[0]; rows[m]++; Q[m] += r[3]; A[m] += r[4];
+    if (D.hasA[m] && D.hasQ[m] && ((r[3] <= 0 && r[4] > 0) || (r[3] > 0 && r[4] <= 0))) mis[m]++;
+    let o = pp[m].get(r[2]); if (!o) { o = qa(); pp[m].set(r[2], o); } addQA(o, r);
+  }
+  const out = D.months.map((ym, m) => {
+    let chg = null;
+    if (m > 0 && D.hasA[m] && D.hasA[m - 1]) {
+      const rs = []; for (const [p, o] of pp[m]) { const o0 = pp[m - 1].get(p); if (o0 && o.q > 0 && o0.q > 0 && o.a > 0 && o0.a > 0) rs.push((o.a / o.q) / (o0.a / o0.q)); }
+      rs.sort((a, b) => a - b); if (rs.length) chg = r1((rs[Math.floor(rs.length / 2)] - 1) * 100);
+    }
+    const both = D.hasA[m] && D.hasQ[m]; const mr = both && rows[m] ? r1((mis[m] / rows[m]) * 100) : null;
+    const flags = []; if (mr != null && mr > 3) flags.push('수량·금액 불일치'); if (chg != null && Math.abs(chg) > 20) flags.push('상품 단가 급변');
+    if (!D.hasA[m]) flags.push('금액 파일 없음'); if (!D.hasQ[m]) flags.push('수량 파일 없음');
+    return { 월: ym, 행수: rows[m], 불일치행: both ? mis[m] : null, 불일치비율: mr, 평균단가: both && Q[m] > 0 ? Math.round(A[m] / Q[m]) : null, 단가변화: chg, 판정: flags.length ? flags.join(', ') : '정상' };
+  });
+  calcQuality.c = out; calcQuality.d = D; return out;
+}
+function calcIns() {
+  return M(['ins', S.ch, S.grp, S.tier].join('|'), () => {
+    const w = insWindows(); const n = D.months.length; const r3 = Math.max(0, n - 3); const ann = 12 / w.K;
+    const R = filt(F()); const vi = isA() ? 4 : 3; const St = D.stores, P = D.products;
+    const inA = (m) => m >= w.A[0] && m <= w.A[1], inB = (m) => m >= w.B[0] && m <= w.B[1];
+    const get = (map, k, init) => { let o = map.get(k); if (!o) { o = init(); map.set(k, o); } return o; };
+    const st = new Map(), sk = new Map(), chs = new Map(), cov = new Map(), chStores = new Map(); const mt = new Array(n).fill(0);
+    for (const r of R) {
+      const m = r[0], v = r[vi], c = St[r[1]].ch; mt[m] += v;
+      const so = get(st, r[1], () => ({ a: 0, b: 0, r3: 0 })), po = get(sk, r[2], () => ({ a: 0, b: 0, r3: 0, chs: new Set() })), co = get(chs, c, () => ({ a: 0, b: 0 }));
+      if (inA(m)) { so.a += v; po.a += v; co.a += v; }
+      if (inB(m)) { so.b += v; po.b += v; co.b += v; }
+      if (m >= r3) { so.r3 += v; po.r3 += v; if (v > 0) { po.chs.add(c); get(chStores, c, () => new Set()).add(r[1]); const x = get(cov, r[2] + '|' + c, () => ({ p: r[2], c, set: new Set(), v: 0 })); x.set.add(r[1]); x.v += v; } }
+    }
+    const TA = [...chs.values()].reduce((t, o) => t + o.a, 0), TB = [...chs.values()].reduce((t, o) => t + o.b, 0);
+    const annual = TB * ann; const sum = (a, b) => { let t = 0; for (let m = Math.max(0, a); m <= b; m++) t += mt[m]; return t; };
+    const last3 = sum(n - 3, n - 1), prev3 = n >= 6 ? sum(n - 6, n - 4) : null, ly3 = n >= 15 ? sum(n - 15, n - 13) : null, lyPrev3 = n >= 18 ? sum(n - 18, n - 16) : null;
+    const mom = { now: prev3 ? pctOf(last3, prev3) : null, ly: ly3 && lyPrev3 ? pctOf(ly3, lyPrev3) : null, yoy3: ly3 ? pctOf(last3, ly3) : null };
+    const sev = (imp) => (imp >= annual * 0.03 ? 'h' : imp >= annual * 0.01 ? 'm' : 'l');
+    const sName = (s) => St[s].name, pName = (p) => P[p].name;
+    const pains = [];
+    // 0. 데이터 점검
+    const dq = calcQuality().filter((x) => /불일치|급변/.test(x.판정));
+    if (dq.length) pains.push({ sev: 'h', key: 'dq', title: '데이터 점검 필요: ' + dq.length + '개월 수량·금액 파일이 서로 맞지 않음', imp: null,
+      text: dq.map((x) => x.월).join(', ') + ' 은(는) 금액은 있는데 수량이 0인 행이 많거나(최대 ' + SHR(Math.max(...dq.map((x) => x.불일치비율 || 0))) + ') 같은 상품의 단가가 전월보다 크게 바뀌었습니다. 이 달들의 판매수량·평균 단가·수량 증감은 실제와 다를 수 있습니다. 매출(금액) 기준 분석을 권장하며, 이마트 시스템에서 수량 파일을 같은 조건으로 다시 받아 올려 주세요.',
+      items: dq.slice(0, 4).map((x) => x.월 + ' · 불일치 ' + SHR(x.불일치비율) + ' · 단가변화 ' + PCT(x.단가변화)), go: { el: 'ins-dq' } });
+    // 1. 업태 역성장
+    const chDecl = [...chs].filter(([, o]) => o.a > 0 && pctOf(o.b, o.a) < -10).map(([c, o]) => ({ c, d: o.b - o.a, p: pctOf(o.b, o.a) })).sort((a, b) => a.d - b.d);
+    if (chDecl.length) { const imp = -chDecl.reduce((t, x) => t + x.d, 0) * ann; pains.push({ sev: sev(imp), key: 'ch', title: '업태 역성장: ' + chDecl.map((x) => x.c).join(', '), imp,
+      text: chDecl.map((x) => x.c + ' ' + PCT(x.p)).join(', ') + '. 연간으로 환산하면 ' + MV(imp) + ' 감소 규모입니다.', items: chDecl.map((x) => x.c + ' ' + SMV(x.d * ann) + '/년'), go: { tab: 'store', ch: chDecl[0].c } }); }
+    // 2. 이탈 점포
+    const lost = [...st].filter(([, o]) => o.a > 0 && o.r3 <= 0); const lostImp = lost.reduce((t, [, o]) => t + o.a, 0) * ann;
+    if (lost.length) { const byc = new Map(); lost.forEach(([s]) => byc.set(St[s].ch, (byc.get(St[s].ch) || 0) + 1)); const bc = [...byc].sort((a, b) => b[1] - a[1]);
+      pains.push({ sev: sev(lostImp), key: 'lost', title: '이탈 점포 ' + N(lost.length) + '곳 (최근 3개월 판매 0)', imp: lostImp,
+        text: '비교 기간엔 팔렸지만 최근 3개월 판매가 없는 점포입니다. ' + bc.map(([c, k]) => c + ' ' + k + '곳').join(', ') + '. 이전 매출 기준 연 ' + MV(lostImp) + ' 규모입니다.',
+        items: lost.sort((a, b) => b[1].a - a[1].a).slice(0, 4).map(([s, o]) => sName(s) + ' (' + St[s].ch + ') ' + MV(o.a * ann) + '/년'), go: { tab: 'store', ch: bc[0][0] } }); }
+    // 3. 부진 점포
+    const weak = [...st].filter(([, o]) => o.a > 0 && o.b > 0 && o.b < o.a * 0.7).map(([s, o]) => ({ s, d: o.a - o.b, p: pctOf(o.b, o.a) })).sort((a, b) => b.d - a.d); const weakImp = weak.reduce((t, x) => t + x.d, 0) * ann;
+    if (weak.length) pains.push({ sev: sev(weakImp), key: 'weak', title: '매출 30% 이상 감소 점포 ' + N(weak.length) + '곳', imp: weakImp,
+      text: '판매는 이어지지만 ' + (w.yoy ? '전년 동기' : '직전 기간') + ' 대비 30% 넘게 줄어든 점포입니다. 감소분은 연 ' + MV(weakImp) + '입니다.',
+      items: weak.slice(0, 4).map((x) => sName(x.s) + ' ' + PCT(x.p) + ' (' + SMV(-x.d * ann) + '/년)'), go: { tab: 'store' } });
+    // 4. 역성장 SKU
+    const skDecl = [...sk].filter(([, o]) => o.a > 0 && o.r3 > 0 && o.b >= o.a * 0.05 && o.b < o.a * 0.9).map(([p, o]) => ({ p, d: o.a - o.b, pc: pctOf(o.b, o.a) })).sort((a, b) => b.d - a.d); const skImp = skDecl.reduce((t, x) => t + x.d, 0) * ann;
+    if (skDecl.length) pains.push({ sev: sev(skImp), key: 'skd', title: '역성장 SKU ' + N(skDecl.length) + '개', imp: skImp,
+      text: '아직 판매 중이지만 10% 넘게 줄어든 상품입니다. 감소분 합계 연 ' + MV(skImp) + '. 상위: ' + skDecl.slice(0, 3).map((x) => pName(x.p)).join(', ') + '.',
+      items: skDecl.slice(0, 4).map((x) => pName(x.p) + ' ' + PCT(x.pc)), go: { tab: 'prod' } });
+    // 5. 판매 중단 SKU
+    const skLost = [...sk].filter(([, o]) => o.a > 0 && (o.r3 <= 0 || o.b < o.a * 0.05)).sort((a, b) => b[1].a - a[1].a); const skLostImp = skLost.reduce((t, [, o]) => t + o.a, 0) * ann;
+    if (skLost.length) pains.push({ sev: sev(skLostImp), key: 'skl', title: '판매 중단 SKU ' + N(skLost.length) + '개 (최근 3개월 판매 없음·95% 이상 감소)', imp: skLostImp,
+      text: '단종·미발주·결품 가능성이 있습니다. 이전 매출 기준 연 ' + MV(skLostImp) + '. 대체 상품으로 매출이 옮겨갔는지 확인이 필요합니다.',
+      items: skLost.slice(0, 4).map(([p, o]) => pName(p) + ' ' + MV(o.a * ann) + '/년'), go: { tab: 'prod' } });
+    // 6. 매출 집중
+    const topSk = [...sk].sort((a, b) => b[1].b - a[1].b); const top2 = TB ? ((topSk[0] ? topSk[0][1].b : 0) + (topSk[1] ? topSk[1][1].b : 0)) / TB * 100 : 0;
+    const topCh = [...chs].sort((a, b) => b[1].b - a[1].b)[0]; const topChS = TB && topCh ? topCh[1].b / TB * 100 : 0;
+    if (top2 > 25 || topChS > 50) pains.push({ sev: 'm', key: 'conc', title: '매출 집중: 상위 2개 SKU ' + SHR(top2) + (topChS > 50 ? ', ' + topCh[0] + ' ' + SHR(topChS) : ''), imp: null,
+      text: '소수 상품·업태에 매출이 몰려 있어 해당 상품의 조건(가격·발주·입점) 변화가 전체 매출을 크게 흔들 수 있습니다.',
+      items: topSk.slice(0, 3).map(([p, o]) => pName(p) + ' ' + SHR(o.b / TB * 100)), go: { tab: 'prod' } });
+    // 7. 모멘텀 둔화
+    if (mom.now != null && (mom.ly != null ? mom.now < mom.ly - 3 : mom.now < -5)) pains.push({ sev: 'm', key: 'mom', title: '최근 3개월 둔화: 직전 3개월 대비 ' + PCT(mom.now), imp: null,
+      text: (mom.ly != null ? '작년 같은 시기(' + PCT(mom.ly) + ')보다 더 크게 꺾였습니다. 계절 요인만으로 설명되지 않는 둔화입니다. ' : '') + (mom.yoy3 != null ? '전년 동월 대비로는 ' + PCT(mom.yoy3) + '입니다.' : ''),
+      items: [], go: { tab: 'sum' } });
+    const order = { h: 0, m: 1, l: 2 };
+    pains.sort((a, b) => (a.key === 'dq' ? -1 : b.key === 'dq' ? 1 : order[a.sev] - order[b.sev] || (b.imp || 0) - (a.imp || 0)));
+    // ── 전략 ──
+    const ws = [];
+    for (const x of cov.values()) { const Nn = chStores.get(x.c).size, k = x.set.size; if (Nn >= 10 && k >= 0.3 * Nn && k < 0.9 * Nn) { const rate = x.v / k / 3; ws.push({ key: x.p + '|' + x.c, 상품명: pName(x.p), 업태: x.c, 취급점포: k, 전체점포: Nn, 취급률: r1((k / Nn) * 100), 미취급: Nn - k, 점당월: rate, 연기회: rate * (Nn - k) * 12 }); } }
+    ws.sort((a, b) => b.연기회 - a.연기회);
+    const newSk = [...sk].filter(([, o]) => o.a <= 0 && o.b > 0).map(([p, o]) => ({ p, b: o.b, chs: o.chs.size })).sort((a, b) => b.b - a.b);
+    const growSk = [...sk].filter(([, o]) => o.a > 0 && o.b > o.a * 1.2).map(([p, o]) => ({ p, d: o.b - o.a, pc: pctOf(o.b, o.a) })).sort((a, b) => b.d - a.d);
+    return { w, ann, TA, TB, annual, growth: pctOf(TB, TA), mom, pains, ws, wsTot: ws.reduce((t, x) => t + x.연기회, 0), lost, lostImp, weak, weakImp, skDecl, skImp, skLost, newSk, growSk, top2, topSk, topCh, chDecl, sName, pName };
+  });
+}
+function renderIns() {
+  const c = calcIns(); const rate = S.insR / 100;
+  setT('ins-basis', MNAME() + ' 기준 · ' + winTxt(c.w) + ' · 이탈·중단은 최근 3개월(' + winL(D.months.length - 3, D.months.length - 1) + ') 판매 여부로 판단 · 상단 업태·품목군·Tier 필터 적용');
+  setT('v-insR', S.insR + '%'); const rr = $('#ins-r'); if (document.activeElement !== rr) rr.value = S.insR;
+  const s1 = c.wsTot * rate, s2 = (c.lostImp + c.weakImp) * rate, s3 = c.skImp * rate; const opp = s1 + s2 + s3;
+  const kp = [
+    ['성장률 (' + (c.w.yoy ? '전년 동기' : '직전 기간') + ' 대비)', PCT(c.growth), c.growth, winL(c.w.B[0], c.w.B[1])],
+    ['최근 3개월 전년 대비', PCT(c.mom.yoy3), c.mom.yoy3, '직전 3개월 대비 ' + PCT(c.mom.now)],
+    ['연환산 현재 ' + MNAME(), MV(c.annual), undefined, '최근 ' + c.w.K + '개월 × 12/' + c.w.K],
+    ['성장 기회 합계 (실현율 ' + S.insR + '%)', SMV(opp), opp, '연환산 대비 ' + PCT(c.annual ? (opp / c.annual) * 100 : null)],
+  ];
+  $('#ins-kpis').replaceChildren(...kp.map(([l, v, sg, sub]) => { const d = el('div', 'card'); const vv = el('div', 'k-v', v); if (sg !== undefined) { vv.classList.toggle('up', sg > 0); vv.classList.toggle('down', sg < 0); } d.append(el('div', 'k-l', l), vv, el('div', 'k-s', sub)); return d; }));
+  // 페인포인트 카드
+  const SEV = { h: '높음', m: '중간', l: '낮음' };
+  const goBtn = (g) => { const b = el('button', 'btn', g.el === 'ins-dq' ? '데이터 점검 보기' : g.el === 'ins-ws' ? '후보 표 보기' : '근거 보기 →'); b.type = 'button';
+    b.addEventListener('click', () => { if (g.el) { $('#' + g.el).scrollIntoView({ behavior: 'smooth' }); return; } const o = { tab: g.tab }; if (g.ch) o.ch = g.ch; set(o); window.scrollTo({ top: 0, behavior: 'smooth' }); }); return b; };
+  const painEls = c.pains.map((p) => { const d = el('div', 'ins-card sev-' + p.sev); const h = el('div', 'ins-h'); h.append(el('span', 'tag tag-' + p.sev, SEV[p.sev]), el('b', '', p.title)); d.append(h);
+    if (p.imp != null) d.append(el('div', 'ins-imp down', '영향 ' + SMV(-p.imp) + ' /년'));
+    d.append(el('p', 'ins-t', p.text)); if (p.items.length) { const ul = el('ul'); p.items.forEach((t) => ul.append(el('li', '', t))); d.append(ul); } d.append(goBtn(p.go)); return d; });
+  $('#ins-pain').replaceChildren(...(painEls.length ? painEls : [el('p', 'hint', '선택한 조건에서 두드러진 문제가 발견되지 않았습니다.')]));
+  // 전략 카드
+  const strat = [];
+  if (c.ws.length) { const t = c.ws[0]; strat.push({ key: 's1', title: '① 핵심 SKU 취급 확대 (화이트 스페이스)', opp: s1,
+    text: '같은 업태에서 이미 잘 팔리는 상품을 아직 들이지 않은 점포에 입점시킵니다. 후보 ' + N(c.ws.length) + '건, 100% 실현 시 연 ' + MV(c.wsTot) + '.',
+    acts: [t.상품명 + ' — ' + t.업태 + ' 미취급 ' + N(t.미취급) + '곳 입점 제안 (취급점 월평균 ' + MV(t.점당월) + ')',
+      (c.ws[1] ? c.ws[1].상품명 + ' — ' + c.ws[1].업태 + ' 미취급 ' + N(c.ws[1].미취급) + '곳 (현재 취급률 ' + SHR(c.ws[1].취급률) + ')' : '취급률이 낮은 SKU부터 협의'),
+      '취급 점포의 판매 실적표를 MD 입점 협의 자료로 활용, 신규 입점점은 첫 2개월 행사로 회전 확보'], go: { el: 'ins-ws' } }); }
+  if (c.lost.length || c.weak.length) { const lc = new Map(); c.lost.forEach(([s]) => lc.set(D.stores[s].ch, (lc.get(D.stores[s].ch) || 0) + 1)); const topLc = [...lc].sort((a, b) => b[1] - a[1])[0];
+    strat.push({ key: 's2', title: '② 이탈·부진 점포 회복', opp: s2,
+      text: '이탈 ' + N(c.lost.length) + '곳(연 ' + MV(c.lostImp) + ')과 30% 이상 감소 ' + N(c.weak.length) + '곳(연 ' + MV(c.weakImp) + ')의 매출을 되찾습니다.',
+      acts: [(topLc ? topLc[0] + ' 이탈 ' + topLc[1] + '곳: 업태 운영 정책(점포 전환·축소) 확인, 회복이 어려우면 같은 상권의 다른 업태로 이전' : '이탈 점포 원인 확인'),
+        (c.weak[0] ? '감소 상위 ' + c.weak.slice(0, 3).map((x) => c.sName(x.s)).join(', ') + ' 현장 점검: 결품·진열 위치·가격표' : '부진 점포 현장 점검'),
+        'Tier A 점포의 상위 SKU 구성을 부진 점포의 표준 진열(필수 SKU 리스트)로 제안'], go: { tab: 'store' } }); }
+  if (c.skDecl.length) strat.push({ key: 's3', title: '③ 역성장 SKU 회복 (행사·리뉴얼)', opp: s3,
+    text: '판매 중인데 줄어든 ' + N(c.skDecl.length) + '개 SKU의 감소분(연 ' + MV(c.skImp) + ')을 되찾습니다.',
+    acts: [c.skDecl.slice(0, 3).map((x) => c.pName(x.p)).join(', ') + ': 경쟁품 가격·결품·행사 공백 원인 확인',
+      '원가가 낮아진(행사) 기간의 판매 증가를 2. 변동 원인 탭(단가 효과)에서 비교해 효율 좋은 행사 유형 재실행', '용량·구성 리뉴얼이나 기획팩(+증정) 검토'], go: { tab: 'prod' } });
+  if (c.newSk.length || c.growSk.length) { const nk = c.newSk.slice(0, 3), gk = c.growSk.slice(0, 3);
+    strat.push({ key: 's4', title: '④ 성장·신규 SKU 확산', opp: null,
+      text: (c.newSk.length ? '신규 SKU ' + N(c.newSk.length) + '개가 ' + MV(c.newSk.reduce((t, x) => t + x.b, 0) * c.ann) + '/년을 만들고 있습니다. ' : '') + (c.growSk.length ? '20% 이상 성장한 SKU ' + N(c.growSk.length) + '개. ' : '') + '잘 되는 상품을 아직 없는 업태로 넓힙니다(같은 업태 안 확대는 ①에 포함).',
+      acts: nk.map((x) => c.pName(x.p) + ' — 현재 ' + x.chs + '개 업태 판매 → 미진입 업태 제안').concat(gk.slice(0, 2).map((x) => c.pName(x.p) + ' ' + PCT(x.pc) + ' 성장 → 행사 물량 확대')).concat(['출시 3개월 판매 추이로 확대/정리 결정 기준 운영']), go: { tab: 'prod' } }); }
+  if (c.top2 > 25) strat.push({ key: 's5', title: '⑤ 매출 의존도 분산', opp: null,
+    text: '상위 2개 SKU가 매출의 ' + SHR(c.top2) + '를 차지합니다. 조건 변경(가격·발주) 위험에 대비해 두 번째 성장 축을 키웁니다.',
+    acts: [c.topSk.slice(0, 2).map(([p]) => c.pName(p)).join(', ') + ': 연간 공급 조건·행사 일정 사전 확정', (c.growSk[0] ? c.pName(c.growSk[0].p) : '성장 SKU') + ' 등 자사 브랜드 SKU를 2nd 축으로 육성(입점·행사 우선 배정)', '업태별 매출 비중 목표를 정해 월간회의에서 관리'], go: { tab: 'prod' } });
+  $('#ins-strat').replaceChildren(...strat.map((s) => { const d = el('div', 'ins-card strat'); d.append(el('div', 'ins-h', null)); d.firstChild.append(el('b', '', s.title));
+    if (s.opp != null) d.append(el('div', 'ins-imp up', '기회 ' + SMV(s.opp) + ' /년')); d.append(el('p', 'ins-t', s.text));
+    const ul = el('ul'); s.acts.forEach((t) => ul.append(el('li', '', t))); d.append(el('div', 'ins-sub', '실행 과제'), ul, goBtn(s.go)); return d; }));
+  // 성장 기회 브리지
+  const rows = [{ 항목: '연환산 현재 ' + MNAME(), 값: c.annual, 유형: 'total', 시작: 0, 끝: c.annual }]; let cum = c.annual;
+  [['① 취급 확대', s1], ['② 이탈·부진 점포 회복', s2], ['③ 역성장 SKU 회복', s3]].forEach(([k, v]) => { rows.push({ 항목: k, 값: v, 유형: 'up', 시작: cum, 끝: cum + v }); cum += v; });
+  rows.push({ 항목: '잠재 ' + MNAME() + ' (연)', 값: cum, 유형: 'total', 시작: 0, 끝: cum });
+  waterfall($('#ins-wf'), rows, null, MV, SMV);
+  // 표
+  table('ws', c.ws, [{ f: '상품명', l: '상품명', cls: 'name' }, { f: '업태', l: '업태' }, { f: '취급점포', l: '취급 점포', fmt: N, cls: 'n' }, { f: '전체점포', l: '업태 점포', fmt: N, cls: 'n' }, { f: '취급률', l: '취급률', fmt: SHR, cls: 'n' },
+    { f: '미취급', l: '미취급', fmt: N, cls: 'n' }, { f: '점당월', l: '취급점 월평균(' + (isA() ? '원' : '개') + ')', fmt: isA() ? N : D1, cls: 'n' }, { f: '연기회', l: '연 기회(100%)', fmt: N, cls: 'n' }],
+    { search: (r) => r.상품명 + ' ' + r.업태, onRow: (r) => { set({ tab: 'prod', ch: r.업태, pSel: D.products.find((p) => p.name === r.상품명).code }); window.scrollTo({ top: 0 }); } });
+  table('dq', calcQuality(), [{ f: '월', l: '월' }, { f: '행수', l: '점포×상품 행', fmt: N, cls: 'n' }, { f: '불일치행', l: '수량·금액 불일치 행', fmt: N, cls: 'n' }, { f: '불일치비율', l: '불일치 비율', fmt: SHR, cls: 'n', sign: (r) => (r.불일치비율 > 3 ? -1 : 0) },
+    { f: '평균단가', l: '평균 단가', fmt: N, cls: 'n' }, { f: '단가변화', l: '상품 단가 전월비(중앙값)', fmt: PCT, cls: 'n', sign: (r) => (Math.abs(r.단가변화) > 20 ? -1 : 0) }, { f: '판정', l: '판정', sign: (r) => (r.판정 === '정상' ? 0 : -1) }], { search: (r) => r.월 + ' ' + r.판정 });
+}
+
 // ════════════════ 컨트롤 ════════════════
 function buildControls() {
   const opt = (v, l) => { const o = document.createElement('option'); o.value = v; o.textContent = l; return o; };
@@ -948,10 +1147,11 @@ function bindOnce() {
   $('#fc-method').addEventListener('change', (e) => set({ fM: e.target.value })); $('#fc-pg').addEventListener('change', (e) => set({ fPG: e.target.value }));
   $$('input[data-fp]').forEach((r) => r.addEventListener('input', () => later({ [r.dataset.fp]: Number(r.value) })));
   $('#fc-reset').addEventListener('click', () => { $$('input[data-fp]').forEach((r) => { r.value = r.dataset.fp === 'fPL' ? 30 : 0; }); $$('input[data-fa]').forEach((r) => { r.value = 0; }); set({ fM: 'yoy', fG: 0, fS: 0, fA: {}, fPM: [], fPL: 30, fPG: '' }); });
+  $('#ins-r').addEventListener('input', (e) => later({ insR: Number(e.target.value) }));
   $$('input[data-q]').forEach((inp) => inp.addEventListener('input', () => { tstate(inp.dataset.q).q = inp.value.trim(); render(); }));
   $$('[data-csv]').forEach((b) => b.addEventListener('click', () => downloadCsv(b.dataset.csv)));
   let rt = 0; window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(render, 150); });
-  window.addEventListener('beforeprint', () => ['sum', 'bridge', 'prod', 'store', 'fc'].forEach((t) => { $('#' + t).hidden = false; }));
+  window.addEventListener('beforeprint', () => ['sum', 'bridge', 'prod', 'store', 'fc', 'ins'].forEach((t) => { $('#' + t).hidden = false; }));
   window.addEventListener('afterprint', render);
 }
 function start(J) {
@@ -960,7 +1160,7 @@ function start(J) {
   // 마지막 달에 금액 자료가 있으면 매출 기준, 없으면 수량 기준으로 시작
   Object.assign(S, { ms: D.hasA[n - 1] ? 'amt' : 'qty', m1: 0, m2: n - 1, ch: '', grp: '', tier: '', dMonth: -1, sGrp: '', bPath: '', bDim: 'ch', pSel: '', sSel: '',
     bA: 'r:' + Math.max(0, n - 2) + ':' + Math.max(0, n - 2), bB: 'r:' + (n - 1) + ':' + (n - 1) });
-  const h = location.hash.replace('#', ''); if (['sum', 'bridge', 'prod', 'store', 'fc'].includes(h)) S.tab = h;
+  const h = location.hash.replace('#', ''); if (['sum', 'bridge', 'prod', 'store', 'fc', 'ins'].includes(h)) S.tab = h;
   buildControls(); $('#loader').hidden = true; $('#main').hidden = false; render();
 }
 
