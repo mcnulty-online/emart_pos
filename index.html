@@ -308,7 +308,7 @@ details.defs li { margin: 4px 0; line-height: 1.6; }
     <li><b>매출</b>: 이마트 POS 판매금액 합계(이마트 매입원가 기준). 금액 파일을 올린 달만 집계됩니다. 원가가 평소보다 낮은 기간은 행사 원가입니다.</li>
     <li><b>판매수량</b>: 이마트 POS 일별 판매수량 합계(반품은 음수로 차감).</li>
     <li><b>평균 단가</b>: 매출 ÷ 수량. 금액 자료가 있는 달만으로 계산합니다.</li>
-    <li><b>품목군</b>: 상품명 기준으로 묶은 10개 그룹. 이마트 분류는 업태마다 달라 쓰지 않았습니다. 규칙은 index.html 의 groupOf() 와 scripts/build_data.py 의 group_of() 에 있습니다.</li>
+    <li><b>품목군</b>: 상품명 기준으로 묶은 11개 그룹. 이마트 분류는 업태마다 달라 쓰지 않았습니다. 규칙은 index.html 의 groupOf() 와 scripts/build_data.py 의 group_of() 에 있습니다.</li>
     <li><b>점포 Tier</b>: 업태마다 최근 12개월 판매수량 순위로 A(상위 20%), B(다음 30%), C(나머지).</li>
     <li><b>취급 요인</b>: 점포×상품 조합 단위로, 기준 기간엔 없고 비교 기간에 팔린 것은 신규 취급, 반대는 취급 중단, 둘 다 팔린 것은 기존 취급 증가·감소.</li>
     <li><b>수량 효과 / 단가 효과</b>: (비교 수량 − 기준 수량) × 기준 단가, (비교 단가 − 기준 단가) × 비교 수량. 두 값의 합이 매출 증감입니다.</li>
@@ -351,19 +351,20 @@ const SMV = (v) => (isA() ? SWON(v) : SEA(v));
 const MNAME = () => (isA() ? '매출' : '판매수량');
 
 const CH_ORDER = ['이마트', '노브랜드', '에브리데이', '트레이더스', '에브리데이B2B'];
-const GROUPS = ['인스턴트 커피', '원두', 'RTD 음료', '액상 에스프레소', '스테비아 커피믹스', '분말 아이스티·레몬', '진액차', '스테비아 차·라떼', '드립백', '필터·용품'];
+const GROUPS = ['인스턴트 커피', '원두', 'RTD 음료', '액상 에스프레소', '스테비아 커피믹스', '커피믹스', '분말 아이스티·레몬', '진액차', '스테비아 차·라떼', '드립백', '필터·용품'];
 // scripts/build_data.py 의 group_of() 와 같은 규칙
 function groupOf(name) {
   const n = String(name || '').replace(/\s/g, '');
   if (n.includes('필터')) return '필터·용품';
-  if (n.includes('진액') || n.includes('보리차')) return '진액차';
-  if (/(1L|1\.5L|500ml|190ml)/i.test(n)) return 'RTD 음료';
-  if (n.includes('아이스티') || n.includes('레몬즙')) return '분말 아이스티·레몬';
+  if (['진액', '보리차', '수염차', '헛개', '액상스틱'].some((k) => n.includes(k))) return '진액차';
   if (n.includes('에스프레소샷') || n.includes('리얼에스프레소')) return '액상 에스프레소';
-  if (n.includes('커피믹스')) return '스테비아 커피믹스';
+  if (/(\d+(\.\d+)?L|\d{3,}ml)/i.test(n)) return 'RTD 음료';
+  if (n.includes('아이스티') || n.includes('레몬즙')) return '분말 아이스티·레몬';
+  if (n.includes('커피믹스')) return n.includes('스테비아') ? '스테비아 커피믹스' : '커피믹스';
   if (['핫초코', '유자차', '율무차', '쌍화차'].some((k) => n.includes(k))) return '스테비아 차·라떼';
   if (n.includes('드립')) return '드립백';
   if (['까페N블랙', '까페N헤이즐넛', '아이브루', '아이스블랙', '50g', '병커피'].some((k) => n.includes(k))) return '인스턴트 커피';
+  if (/\d+입/.test(n) && !['원두', '홀빈', '분쇄', '드립'].some((k) => n.includes(k))) return '인스턴트 커피';
   return '원두';
 }
 
@@ -1001,11 +1002,9 @@ async function readXlsx(file) {
   return rows;
 }
 const txt = (v) => (v == null ? '' : String(v).trim().split(/\s+/).join(' '));
-// scripts/build_data.py 의 kind_of() 와 같은 규칙: 파일명 키워드 → 값 크기
+// scripts/build_data.py 의 kind_of() 와 같은 결과: 값 크기 기준
 function kindOf(name, rows) {
-  const low = name.toLowerCase();
-  if (['금액', '매출', 'amount', 'amt'].some((w) => low.includes(w))) return 'amt';
-  if (['수량', 'qty', 'quantity'].some((w) => low.includes(w))) return 'qty';
+  // 값 크기로 판별(일별 값 중앙값 100 이상 = 금액). 파일명 키워드와 다르면 값 크기를 따릅니다.
   const hdr = (rows[0] || []).map(txt); const dayCols = hdr.map((h, i) => (/^\d{1,2}월\d{1,2}일$/.test(h) ? i : -1)).filter((i) => i >= 0);
   const vals = []; for (let k = 1; k < Math.min(rows.length, 3001); k++) for (const ci of dayCols) { const v = Number(rows[k][ci]); if (v > 0) vals.push(v); }
   vals.sort((a, b) => a - b); const med = vals.length ? vals[Math.floor(vals.length / 2)] : 0;

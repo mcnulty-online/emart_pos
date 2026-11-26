@@ -29,12 +29,12 @@ RAW_DIR = os.path.join(ROOT, "data", "raw")
 OUT_FILE = os.path.join(ROOT, "data", "pos_data.json")
 
 CH_ORDER = ["이마트", "노브랜드", "에브리데이", "트레이더스", "에브리데이B2B"]
-GROUPS = ["인스턴트 커피", "원두", "RTD 음료", "액상 에스프레소", "스테비아 커피믹스",
+GROUPS = ["인스턴트 커피", "원두", "RTD 음료", "액상 에스프레소", "스테비아 커피믹스", "커피믹스",
           "분말 아이스티·레몬", "진액차", "스테비아 차·라떼", "드립백", "필터·용품"]
 REQUIRED = ["업태명", "점포코드", "점포명", "상품코드", "상품명"]
 DAY_RE = re.compile(r"^(\d{1,2})월(\d{1,2})일$")
 YM_RE = re.compile(r"(20\d{2})(0[1-9]|1[0-2])")
-RTD_RE = re.compile(r"(1L|1\.5L|500ml|190ml)", re.I)
+RTD_RE = re.compile(r"(\d+(\.\d+)?L|\d{3,}ml)", re.I)  # 1L·2.1L·190ml·400ml 등 (10ml 진액·샷 제외)
 AMT_WORDS = ("금액", "매출", "amount", "amt")
 QTY_WORDS = ("수량", "qty", "quantity")
 KIND_NAME = {"qty": "수량", "amt": "금액"}
@@ -44,22 +44,24 @@ def group_of(name: str) -> str:
     n = re.sub(r"\s", "", name or "")
     if "필터" in n:
         return "필터·용품"
-    if "진액" in n or "보리차" in n:
+    if any(k in n for k in ["진액", "보리차", "수염차", "헛개", "액상스틱"]):
         return "진액차"
+    if "에스프레소샷" in n or "리얼에스프레소" in n:
+        return "액상 에스프레소"
     if RTD_RE.search(n):
         return "RTD 음료"
     if "아이스티" in n or "레몬즙" in n:
         return "분말 아이스티·레몬"
-    if "에스프레소샷" in n or "리얼에스프레소" in n:
-        return "액상 에스프레소"
     if "커피믹스" in n:
-        return "스테비아 커피믹스"
+        return "스테비아 커피믹스" if "스테비아" in n else "커피믹스"
     if any(k in n for k in ["핫초코", "유자차", "율무차", "쌍화차"]):
         return "스테비아 차·라떼"
     if "드립" in n:
         return "드립백"
     if any(k in n for k in ["까페N블랙", "까페N헤이즐넛", "아이브루", "아이스블랙", "50g", "병커피"]):
         return "인스턴트 커피"
+    if re.search(r"\d+입", n) and not any(k in n for k in ["원두", "홀빈", "분쇄", "드립"]):
+        return "인스턴트 커피"  # 예: 디카페인헤이즐넛 80입(스틱)
     return "원두"
 
 
@@ -87,12 +89,7 @@ def read_sheet(path):
     return idx, days, rows
 
 
-def kind_of(fname: str, days, rows) -> str:
-    low = fname.lower()
-    if any(w in low for w in AMT_WORDS):
-        return "amt"
-    if any(w in low for w in QTY_WORDS):
-        return "qty"
+def kind_by_values(days, rows) -> str:
     vals = []
     for r in rows[:3000]:
         for ci, _, _ in days:
@@ -100,6 +97,16 @@ def kind_of(fname: str, days, rows) -> str:
             if isinstance(v, (int, float)) and v > 0:
                 vals.append(v)
     return "amt" if vals and statistics.median(vals) >= 100 else "qty"
+
+
+def kind_of(fname: str, days, rows) -> str:
+    # 이마트 원본 파일명은 늘 '기간별매출'로 시작하므로 그 부분은 빼고 판단합니다.
+    low = fname.lower().replace("기간별매출", "")
+    by_value = kind_by_values(days, rows)
+    by_name = "qty" if any(w in low for w in QTY_WORDS) else "amt" if any(w in low for w in AMT_WORDS) else None
+    if by_name and by_name != by_value:
+        print(f"[주의] {fname}: 파일명은 {KIND_NAME[by_name]}인데 값 크기는 {KIND_NAME[by_value]}처럼 보입니다. 값 크기 기준({KIND_NAME[by_value]})으로 읽습니다.")
+    return by_value if by_name != by_value else by_name
 
 
 def main() -> int:
